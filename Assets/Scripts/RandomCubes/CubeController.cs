@@ -13,9 +13,17 @@ public class CubeController : MonoBehaviour
     [Min(1)]
     public int numCubesY;
 
-
+    [Header("ComputeShader")]
+    public ComputeShader shader;
 
     private GameObject[,] cubes = new GameObject[0,0];
+
+
+    public struct Cube
+    {
+        public Vector3 position;
+        public Color color; 
+    }
 
     public void OnCPURandomizeClick()
     {
@@ -27,8 +35,6 @@ public class CubeController : MonoBehaviour
         if (cubes.GetLength(0) != numCubesX || cubes.GetLength(1) != numCubesY)
             UpdateCubesArray();
 
-        
-
         for(int x = 0; x < numCubesX; x++)
         {
             for(int y = 0; y < numCubesY; y++)
@@ -39,13 +45,50 @@ public class CubeController : MonoBehaviour
         }
 
         float endTime = Time.realtimeSinceStartup;
-
         float runTime = endTime - startTime;
         Debug.Log("Total Run time for CPU To Randomize " + (numCubesX * numCubesY) + " cubes: " + runTime);
     }
 
     public void OnGPURandomizeClick()
     {
+
+        //Measure the amount of time this function takes
+        float startTime = Time.realtimeSinceStartup;
+
+        //Create our cube array and compute buffer
+        Cube[,] data = new Cube[numCubesX, numCubesY];
+        int cubeSize = sizeof(float) * 3 + sizeof(float) * 4;
+        ComputeBuffer cubesBuffer = new ComputeBuffer(data.GetLength(0) * data.GetLength(1), cubeSize);
+        cubesBuffer.SetData(data);
+
+        shader.SetBuffer(0, "cubes", cubesBuffer);
+        shader.SetInt("numCubesX", numCubesX);
+        shader.SetInt("numCubesY", numCubesY);
+        shader.SetFloat("timeOffset", Time.time);
+
+        shader.Dispatch(0, data.GetLength(0), data.GetLength(1), 1);
+
+        if (cubes.GetLength(0) != numCubesX || cubes.GetLength(1) != numCubesY)
+            UpdateCubesArray();
+
+        cubesBuffer.GetData(data);
+
+        //Set the gameobjects color to the gpu color output
+        for (int x = 0; x < data.GetLength(0); x++)
+        {
+            for(int y = 0; y < data.GetLength(1); y++)
+            {
+                cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", data[x, y].color);
+            }
+        }
+
+        //Release buffer
+        cubesBuffer.Release();
+
+        //Measure the amount of time this function takes
+        float endTime = Time.realtimeSinceStartup;
+        float runTime = endTime - startTime;
+        Debug.Log("Total Run time for GPU To Randomize " + (numCubesX * numCubesY) + " cubes: " + runTime);
 
     }
 

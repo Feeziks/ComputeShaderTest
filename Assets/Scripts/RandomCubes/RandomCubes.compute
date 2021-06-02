@@ -1,14 +1,47 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
+struct Cube
+{
+    float3 position;
+    float4 color;
+};
 
-[numthreads(8,8,1)]
+float hash(float2 p);
+float3 hash3(int3 x);
+const uint k = 1103515245U;  // GLIB C
+
+RWStructuredBuffer<Cube> cubes;
+float timeOffset;
+int numCubesX;
+int numCubesY;
+
+[numthreads(1,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
+    Cube cube = cubes[id.y * numCubesX + id.x];
+    //Create 4 random floats 0 to 1.0f
+    float4 col;
+    col.xyz = hash3(id.x * timeOffset, id.y * timeOffset, id.z * timeOffset);
+    //col.x = hash(id.x * timeOffset + id.y * timeOffset);
+    //col.y = hash(id.x * timeOffset + id.z * timeOffset);
+    //col.z = hash(id.y * timeOffset + id.z * timeOffset);
+    col.w = 1.0f;
+    cube.color = col;
 
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+    cubes[id.y * numCubesX + id.x] = cube;
+}
+
+float hash(float2 p)
+{
+    return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+float3 hash3(int3 x)
+{
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+
+    return float3(x) * (1.0 / float(0xffffffffU));
 }
