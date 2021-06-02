@@ -20,11 +20,14 @@ public class CubeController : MonoBehaviour
     public void OnCPURandomizeClick()
     {
 
-        Debug.Log("Randomizing " + (numCubesX * numCubesY) + " Total Cubes on CPU");
+        //Measure the amount of time this function takes
+        float startTime = Time.realtimeSinceStartup;
 
         //Check if the current cubes array is the right size
         if (cubes.GetLength(0) != numCubesX || cubes.GetLength(1) != numCubesY)
             UpdateCubesArray();
+
+        
 
         for(int x = 0; x < numCubesX; x++)
         {
@@ -34,6 +37,11 @@ public class CubeController : MonoBehaviour
                 cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", Random.ColorHSV(0f, 1f, 1f, 1f, 0.5f, 1f));
             }
         }
+
+        float endTime = Time.realtimeSinceStartup;
+
+        float runTime = endTime - startTime;
+        Debug.Log("Total Run time for CPU To Randomize " + (numCubesX * numCubesY) + " cubes: " + runTime);
     }
 
     public void OnGPURandomizeClick()
