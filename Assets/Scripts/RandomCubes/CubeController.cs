@@ -12,11 +12,14 @@ public class CubeController : MonoBehaviour
     public int numCubesX;
     [Min(1)]
     public int numCubesY;
+    [Min(1)]
+    public int iterations;
 
     [Header("ComputeShader")]
     public ComputeShader shader;
 
     private GameObject[,] cubes = new GameObject[0,0];
+    private Renderer[,] cubesRenderers = new Renderer[0,0];
 
 
     public struct Cube
@@ -34,19 +37,24 @@ public class CubeController : MonoBehaviour
         //Check if the current cubes array is the right size
         if (cubes.GetLength(0) != numCubesX || cubes.GetLength(1) != numCubesY)
             UpdateCubesArray();
-
-        for(int x = 0; x < numCubesX; x++)
+        for (int i = 0; i < iterations; i++)
         {
-            for(int y = 0; y < numCubesY; y++)
+            for (int x = 0; x < numCubesX; x++)
             {
-                //Randomly Set the color of the cube
-                cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", Random.ColorHSV(0f, 1f, 1f, 1f, 0.5f, 1f));
+                for (int y = 0; y < numCubesY; y++)
+                {
+                    //Randomly Set the color of the cube
+                    if (cubesRenderers[x, y] != null)
+                        cubesRenderers[x, y].material.SetColor("_BaseColor", Random.ColorHSV(0f, 1f, 0f, 1f, 0.5f, 1f));
+                    else
+                        cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", Random.ColorHSV(0f, 1f, 0f, 1f, 0.5f, 1f));
+                }
             }
         }
 
         float endTime = Time.realtimeSinceStartup;
         float runTime = endTime - startTime;
-        Debug.Log("Total Run time for CPU To Randomize " + (numCubesX * numCubesY) + " cubes: " + runTime);
+        Debug.Log("Total Run time for CPU To Randomize " + (numCubesX * numCubesY) + " cubes " + iterations + " times: " + runTime);
     }
 
     public void OnGPURandomizeClick()
@@ -65,6 +73,7 @@ public class CubeController : MonoBehaviour
         shader.SetInt("numCubesX", numCubesX);
         shader.SetInt("numCubesY", numCubesY);
         shader.SetFloat("timeOffset", Time.time);
+        shader.SetInt("iterations", iterations);
 
         shader.Dispatch(0, data.GetLength(0), data.GetLength(1), 1);
 
@@ -72,23 +81,26 @@ public class CubeController : MonoBehaviour
             UpdateCubesArray();
 
         cubesBuffer.GetData(data);
-
+        
         //Set the gameobjects color to the gpu color output
         for (int x = 0; x < data.GetLength(0); x++)
         {
             for(int y = 0; y < data.GetLength(1); y++)
             {
-                cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", data[x, y].color);
+                if (cubesRenderers[x, y] != null)
+                    cubesRenderers[x, y].material.SetColor("_BaseColor", data[x, y].color);
+                else
+                    cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", data[x,y].color);
             }
         }
-
+        
         //Release buffer
         cubesBuffer.Release();
 
         //Measure the amount of time this function takes
         float endTime = Time.realtimeSinceStartup;
         float runTime = endTime - startTime;
-        Debug.Log("Total Run time for GPU To Randomize " + (numCubesX * numCubesY) + " cubes: " + runTime);
+        Debug.Log("Total Run time for GPU To Randomize " + (numCubesX * numCubesY) + " cubes " + iterations + " times: " + runTime);
 
     }
 
@@ -96,6 +108,7 @@ public class CubeController : MonoBehaviour
     private void UpdateCubesArray()
     {
         GameObject[,] newCubes = new GameObject[numCubesX, numCubesY];
+        Renderer[,] newRenderer = new Renderer[numCubesX, numCubesY];
 
         Debug.Log("Resizing Cubes Array ... ");
 
@@ -112,6 +125,8 @@ public class CubeController : MonoBehaviour
                 newCubes[x, y] = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 newCubes[x, y].transform.SetParent(this.transform);
                 newCubes[x, y].transform.position = new Vector3(x, y, Random.Range(-0.25f, 0.25f));
+
+                newRenderer[x, y] = newCubes[x, y].GetComponent<Renderer>();
             }
         }
 
@@ -138,6 +153,7 @@ public class CubeController : MonoBehaviour
         }
 
         cubes = newCubes;
+        cubesRenderers = newRenderer;
 
         Debug.Log("Cubes array resized to :[" + cubes.GetLength(0) + ", " + cubes.GetLength(1) + "]");
 

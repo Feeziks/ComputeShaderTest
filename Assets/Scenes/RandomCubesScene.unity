@@ -913,6 +913,8 @@ MonoBehaviour:
   cam: {fileID: 650791919}
   numCubesX: 10
   numCubesY: 10
+  iterations: 1000
+  shader: {fileID: 7200000, guid: 66f92920a416ff54b8e06d9e3bb1f344, type: 3}
 --- !u!4 &1408540003
 Transform:
   m_ObjectHideFlags: 0
