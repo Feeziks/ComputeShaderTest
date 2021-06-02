@@ -31,7 +31,7 @@ public class CubeController : MonoBehaviour
             for(int y = 0; y < numCubesY; y++)
             {
                 //Randomly Set the color of the cube
-
+                cubes[x, y].GetComponent<Renderer>().material.SetColor("_BaseColor", Random.ColorHSV(0f, 1f, 1f, 1f, 0.5f, 1f));
             }
         }
     }
