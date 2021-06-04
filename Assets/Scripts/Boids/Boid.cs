@@ -64,40 +64,38 @@ public class Boid : MonoBehaviour
         //Calculate a cumulative change to move away from them
         //Weighted by how close we are to each boid
 
-        //Whats faster, a second cast at seperate distance or just check the collider for distance
         Vector3 adjustment = new Vector3(0, 0, 0);
 
         foreach(GameObject go in nearbyBoids)
         {
-            if(Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= seperateDistance)
+            //Whats faster, a second cast at seperate distance or just check the collider for distance
+            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= seperateDistance)
             {
-                //Nudge the boid to move away from the nearby boid - but dont force them in opposite directions
+                //Nudge the boid to move away from the nearby boid
                 //Take the nearby boids orientation and speed into account if possible
                 //TODO: Is there any need to divide the resulting adjustment by the number of boids nearby?
 
-                Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
                 //Naive predict boids next location 
+                Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
                 Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
-
-                //Get the closest point along the line from thatBoid to thatBoidsNextPos to our current boid
                 Vector3 closestPoint = NearestPointOnLine(go.transform.position, thatBoidsNextPos, transform.position);
 
                 //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
                 Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
                 CrossProd.Normalize();
-                Vector3 ScaledAvoidance = CrossProd * (1 / Mathf.Abs(Vector3.Distance(transform.position , closestPoint)));
+                float inverseDistance = (float)1.0f / Mathf.Abs(Vector3.Distance(transform.position, closestPoint));
 
-                if(float.IsNaN(ScaledAvoidance.x) || float.IsNaN(ScaledAvoidance.y) || float.IsNaN(ScaledAvoidance.z))
+                //TODO: How to reduce the number of potential divide by 0's
+                if (float.IsNaN(inverseDistance) || float.IsInfinity(inverseDistance) || float.IsNegativeInfinity(inverseDistance))
                 {
-                    Debug.Log("Dividng by 0!");
+                    //Error state - skip this
+                    continue;
                 }
                 else
                 {
+                    Vector3 ScaledAvoidance = CrossProd * inverseDistance;
                     adjustment += ScaledAvoidance;
                 }
-
-                
-
             }
         }
 
