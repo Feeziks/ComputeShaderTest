@@ -104,9 +104,25 @@ public class Boid : MonoBehaviour
 
     private Vector3 Alignment()
     {
+        //Steer towards the average heading of flockmates
 
+        Vector3 adjustment = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector3 averageHeading = new Vector3(0.0f, 0.0f, 0.0f);
 
-        return Vector3.zero;
+        foreach(GameObject go in nearbyBoids)
+        {
+            //Get the heading of each boid
+            Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
+            Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
+
+            Vector3 thatBoidHeading = thatBoidsNextPos - go.transform.position;
+            averageHeading += thatBoidHeading;
+        }
+
+        adjustment = averageHeading / (float)nearbyBoids.Count;
+        Debug.Log(adjustment);
+
+        return adjustment;
     }
 
     private Vector3 Cohesion()
