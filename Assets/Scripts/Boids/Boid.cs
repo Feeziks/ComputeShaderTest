@@ -75,8 +75,6 @@ public class Boid : MonoBehaviour
                 //Take the nearby boids orientation and speed into account if possible
                 //TODO: Is there any need to divide the resulting adjustment by the number of boids nearby?
 
-                //Get the boid we are looking at's orientation and velocity
-                Quaternion thatBoidQuat = go.transform.rotation;
                 Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
                 //Naive predict boids next location 
                 Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
@@ -85,14 +83,25 @@ public class Boid : MonoBehaviour
                 Vector3 closestPoint = NearestPointOnLine(go.transform.position, thatBoidsNextPos, transform.position);
 
                 //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
-                Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);//
+                Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
                 CrossProd.Normalize();
-                Vector3 ScaledAvoidance = CrossProd * (1 / Mathf.Abs(Vector3.Magnitude(transform.position - closestPoint)));
-                adjustment += ScaledAvoidance;
+                Vector3 ScaledAvoidance = CrossProd * (1 / Mathf.Abs(Vector3.Distance(transform.position , closestPoint)));
+
+                if(float.IsNaN(ScaledAvoidance.x) || float.IsNaN(ScaledAvoidance.y) || float.IsNaN(ScaledAvoidance.z))
+                {
+                    Debug.Log("Dividng by 0!");
+                }
+                else
+                {
+                    adjustment += ScaledAvoidance;
+                }
+
+                
+
             }
         }
 
-        return Vector3.zero;
+        return adjustment;
     }
 
     private Vector3 Alignment()
@@ -144,19 +153,13 @@ public class Boid : MonoBehaviour
 
         foreach (GameObject go in nearbyBoids)
         {
-            Gizmos.DrawLine(transform.position, go.transform.position);
-
-            //Also draw the direction of avoidance
-            Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
-            Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
-            Vector3 closestPoint = NearestPointOnLine(go.transform.position, thatBoidsNextPos, transform.position);
-
-            //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
-            Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
-            Gizmos.color = Color.white;
-            Gizmos.DrawLine(go.transform.position, thatBoidsNextPos);
             Gizmos.color = Color.green;
-            Gizmos.DrawLine(closestPoint, CrossProd);
+
+            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= seperateDistance)
+            {
+                Gizmos.color = Color.white;
+            }
+            Gizmos.DrawLine(transform.position, go.transform.position);
         }
     }
 
