@@ -9,6 +9,7 @@ public class Boid : MonoBehaviour
     public float seperationWeight = 0.33f;
     public float alignmentWeight = 0.33f;
     public float cohesionWeight = 0.33f;
+    public float obstacleWeight = 1.0f;
 
     public float maxVelMag = 25.0f;
     public float speedUpNudge = 0.05f;
@@ -17,6 +18,7 @@ public class Boid : MonoBehaviour
 
     //Private members
     private List<GameObject> nearbyBoids;
+    private List<GameObject> nearbyObstacles;
     private const float viewDistance = 20.0f;
     private const float seperateDistance = 10.0f;
     private Vector3 DAccel; //Delta Acceleration - force to apply after performing all rules / checks
@@ -38,7 +40,7 @@ public class Boid : MonoBehaviour
         DAccel = Vector3.zero;
         
         //Fixed update will actually perform the seperation, alignment, and cohesion steps
-        GetNearbyBoids();
+        GetNearbyBoidsObstacles();
 
         Vector3 sperationAccel = Seperation();
 
@@ -46,10 +48,13 @@ public class Boid : MonoBehaviour
 
         Vector3 cohesionAccel = Cohesion();
 
+        Vector3 obstacleAceel = AvoidObstacles();
+
         //Sum all of the accelerations according to some weights
         DAccel += sperationAccel * seperationWeight;
         DAccel += alignmentAccel * alignmentWeight;
         DAccel += cohesionAccel * cohesionWeight;
+        DAccel += obstacleAceel * obstacleWeight;
 
         //TODO: How / When to change the orientation of the boid so it continues to move "forward"
 
@@ -163,18 +168,37 @@ public class Boid : MonoBehaviour
         return adjustment;
     }
 
+    private Vector3 AvoidObstacles()
+    {
+        //Avoid all the obstacles in the boids path
+
+        return Vector3.zero;
+    }
+
     // Helpers
 
-    private void GetNearbyBoids()
+    private void GetNearbyBoidsObstacles()
     {
         nearbyBoids = new List<GameObject>();
+        nearbyObstacles = new List<GameObject>();
 
         //Cast a sphere of radius max view distance and find all collisions
         Collider[] hitColliders = Physics.OverlapSphere(transform.position, viewDistance);
 
         foreach(Collider hit in hitColliders)
         {
-            nearbyBoids.Add(hit.gameObject);
+            //Sort of bad, since we can ensure the objects we create are only on the one layer this should work
+            //Otherwise if the gameobject had multiple layers we should only check that individual bit like this
+            //if(hit.gameObject.layer & ( 1 << layerNumber) == (1 << layerNumber))
+            if (hit.gameObject.layer == LayerMask.NameToLayer("Boid_Layer"))
+            {
+                nearbyBoids.Add(hit.gameObject);
+            }
+
+            if(hit.gameObject.layer == LayerMask.NameToLayer("Obstacle_Layer"))
+            {
+                nearbyObstacles.Add(hit.gameObject);
+            }
         }
     }
 

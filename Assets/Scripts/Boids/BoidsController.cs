@@ -33,6 +33,8 @@ public class BoidsController : MonoBehaviour
             thisBoid.transform.position = new Vector3(Random.Range(-10.0f, 10.0f), Random.Range(-10.0f, 10.0f), Random.Range(-10.0f, 10.0f)); //Place the boid randomly
             thisBoid.transform.rotation = Random.rotation; //Have the boid face a random direction
             thisBoid.GetComponent<Rigidbody>().AddForce(thisBoid.transform.up * Random.Range(0.0f, 100.0f), ForceMode.Acceleration); //Kick the boid
+            thisBoid.layer = LayerMask.NameToLayer("Boid_Layer");
+            thisBoid.name = "Boid_" + i;
         }
     }
 
