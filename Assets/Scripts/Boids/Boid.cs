@@ -131,16 +131,36 @@ public class Boid : MonoBehaviour
         }
         if (nearbyBoids.Count != 0)
         {
-            adjustment = averageHeading / (float)nearbyBoids.Count;
+            averageHeading /= (float)nearbyBoids.Count;
         }
+
+        //This was wrong previously, need to make the adjustment align this boid with the average heading not just assign it the average heading
+        //Probably why we saw adjustment dominate the seperation
+        adjustment = averageHeading - transform.position;
 
         return adjustment;
     }
 
     private Vector3 Cohesion()
     {
+        //Steer towards the center of mass of flockmates 
 
-        return Vector3.zero;
+        Vector3 adjustment = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector3 centerOfMass = new Vector3(0.0f, 0.0f, 0.0f);
+
+        foreach(GameObject go in nearbyBoids)
+        {
+            centerOfMass += go.transform.position;
+        }
+
+        if(nearbyBoids.Count != 0)
+        {
+            centerOfMass /= nearbyBoids.Count;
+        }
+
+        adjustment = centerOfMass - transform.position;
+
+        return adjustment;
     }
 
     // Helpers
@@ -187,6 +207,9 @@ public class Boid : MonoBehaviour
             }
             Gizmos.DrawLine(transform.position, go.transform.position);
         }
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawRay(transform.position, DAccel);
     }
 
 }
