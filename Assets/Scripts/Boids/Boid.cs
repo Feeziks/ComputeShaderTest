@@ -10,6 +10,9 @@ public class Boid : MonoBehaviour
     public float alignmentWeight = 0.33f;
     public float cohesionWeight = 0.33f;
 
+    public float maxVelMag = 25.0f;
+    public float speedUpNudge = 0.05f;
+
     public float futureSight = 100;// How many fixed updates into the future can the boid predict its fellow boids motion?
 
     //Private members
@@ -50,11 +53,19 @@ public class Boid : MonoBehaviour
 
         //TODO: How / When to change the orientation of the boid so it continues to move "forward"
 
-
         //Apply this acceleration to the boid as a force
         myBody.AddForce(DAccel, ForceMode.Acceleration);
 
         //If the velocity of the boid is not at the max add another nudge to it in its current direction
+        if(myBody.velocity.magnitude < maxVelMag)
+        {
+            myBody.AddForce(transform.up * speedUpNudge);
+        }
+        //Otherwise clamp the boid's velocity
+        else if(myBody.velocity.magnitude > maxVelMag)
+        {
+            myBody.velocity = Vector3.ClampMagnitude(myBody.velocity, maxVelMag);
+        }
     }
 
 
@@ -118,9 +129,10 @@ public class Boid : MonoBehaviour
             Vector3 thatBoidHeading = thatBoidsNextPos - go.transform.position;
             averageHeading += thatBoidHeading;
         }
-
-        adjustment = averageHeading / (float)nearbyBoids.Count;
-        Debug.Log(adjustment);
+        if (nearbyBoids.Count != 0)
+        {
+            adjustment = averageHeading / (float)nearbyBoids.Count;
+        }
 
         return adjustment;
     }
