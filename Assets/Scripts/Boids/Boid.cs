@@ -6,21 +6,11 @@ public class Boid : MonoBehaviour
 {
 
     //Public Members
-    public float seperationWeight = 0.33f;
-    public float alignmentWeight = 0.33f;
-    public float cohesionWeight = 0.33f;
-    public float obstacleWeight = 1.0f;
-
-    public float maxVelMag = 25.0f;
-    public float speedUpNudge = 0.05f;
-
-    public float futureSight = 100;// How many fixed updates into the future can the boid predict its fellow boids motion?
+    public BoidsSettings settings;
 
     //Private members
     private List<GameObject> nearbyBoids;
     private List<GameObject> nearbyObstacles;
-    private const float viewDistance = 20.0f;
-    private const float seperateDistance = 10.0f;
     private Vector3 DAccel; //Delta Acceleration - force to apply after performing all rules / checks
     private Rigidbody myBody;
 
@@ -51,10 +41,10 @@ public class Boid : MonoBehaviour
         Vector3 obstacleAceel = AvoidObstacles();
 
         //Sum all of the accelerations according to some weights
-        DAccel += sperationAccel * seperationWeight;
-        DAccel += alignmentAccel * alignmentWeight;
-        DAccel += cohesionAccel * cohesionWeight;
-        DAccel += obstacleAceel * obstacleWeight;
+        DAccel += sperationAccel * settings.seperationWeight;
+        DAccel += alignmentAccel * settings.alignmentWeight;
+        DAccel += cohesionAccel * settings.cohesionWeight;
+        DAccel += obstacleAceel * settings.obstacleWeight;
 
         //TODO: How / When to change the orientation of the boid so it continues to move "forward"
 
@@ -62,15 +52,20 @@ public class Boid : MonoBehaviour
         myBody.AddForce(DAccel, ForceMode.Acceleration);
 
         //If the velocity of the boid is not at the max add another nudge to it in its current direction
-        if(myBody.velocity.magnitude < maxVelMag)
+        /*
+        if(myBody.velocity.magnitude < settings.maxVelocityMagnitude)
         {
-            myBody.AddForce(transform.up * speedUpNudge);
+            myBody.AddForce(transform.up * settings.speedUp);
         }
+        */
         //Otherwise clamp the boid's velocity
-        else if(myBody.velocity.magnitude > maxVelMag)
+        if(myBody.velocity.magnitude > settings.maxVelocityMagnitude)
         {
-            myBody.velocity = Vector3.ClampMagnitude(myBody.velocity, maxVelMag);
+            myBody.velocity = Vector3.ClampMagnitude(myBody.velocity, settings.maxVelocityMagnitude);
         }
+
+        //TODO:Rotate the boid in the direction of travel
+        myBody.MoveRotation(Quaternion.LookRotation(myBody.velocity.normalized));
     }
 
 
@@ -85,7 +80,7 @@ public class Boid : MonoBehaviour
         foreach(GameObject go in nearbyBoids)
         {
             //Whats faster, a second cast at seperate distance or just check the collider for distance
-            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= seperateDistance)
+            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.sperationViewDistance)
             {
                 //Nudge the boid to move away from the nearby boid
                 //Take the nearby boids orientation and speed into account if possible
@@ -93,7 +88,7 @@ public class Boid : MonoBehaviour
 
                 //Naive predict boids next location 
                 Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
-                Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
+                Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * settings.futureSight));
                 Vector3 closestPoint = NearestPointOnLine(go.transform.position, thatBoidsNextPos, transform.position);
 
                 //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
@@ -129,7 +124,7 @@ public class Boid : MonoBehaviour
         {
             //Get the heading of each boid
             Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
-            Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * futureSight));
+            Vector3 thatBoidsNextPos = go.transform.position + (thatBoidVel * (Time.fixedDeltaTime * settings.futureSight));
 
             Vector3 thatBoidHeading = thatBoidsNextPos - go.transform.position;
             averageHeading += thatBoidHeading;
@@ -142,6 +137,7 @@ public class Boid : MonoBehaviour
         //This was wrong previously, need to make the adjustment align this boid with the average heading not just assign it the average heading
         //Probably why we saw adjustment dominate the seperation
         adjustment = averageHeading - transform.position;
+        adjustment.Normalize();
 
         return adjustment;
     }
@@ -164,15 +160,39 @@ public class Boid : MonoBehaviour
         }
 
         adjustment = centerOfMass - transform.position;
+        adjustment.Normalize();
 
         return adjustment;
     }
 
     private Vector3 AvoidObstacles()
     {
+        Vector3 adjustment = new Vector3(0.0f, 0.0f, 0.0f);
         //Avoid all the obstacles in the boids path
+        foreach(GameObject go in nearbyObstacles)
+        {
+            Vector3 obstacleVel = go.GetComponent<Rigidbody>().velocity;
+            Vector3 obstacleNextPos = go.transform.position + (obstacleVel * (Time.fixedDeltaTime * settings.futureSight));
+            Vector3 closestPoint = NearestPointOnLine(go.transform.position, obstacleNextPos, transform.position);
 
-        return Vector3.zero;
+            //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
+            Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
+            CrossProd.Normalize();
+            float inverseDistance = (float)1.0f / Mathf.Abs(Vector3.Distance(transform.position, closestPoint));
+
+            //TODO: How to reduce the number of potential divide by 0's
+            if (float.IsNaN(inverseDistance) || float.IsInfinity(inverseDistance) || float.IsNegativeInfinity(inverseDistance))
+            {
+                //Error state - skip this
+                continue;
+            }
+            else
+            {
+                Vector3 ScaledAvoidance = CrossProd * inverseDistance;
+                adjustment += ScaledAvoidance;
+            }
+        }
+        return adjustment;
     }
 
     // Helpers
@@ -183,7 +203,7 @@ public class Boid : MonoBehaviour
         nearbyObstacles = new List<GameObject>();
 
         //Cast a sphere of radius max view distance and find all collisions
-        Collider[] hitColliders = Physics.OverlapSphere(transform.position, viewDistance);
+        Collider[] hitColliders = Physics.OverlapSphere(transform.position, settings.viewDistance);
 
         foreach(Collider hit in hitColliders)
         {
@@ -219,13 +239,13 @@ public class Boid : MonoBehaviour
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, viewDistance);
+        Gizmos.DrawWireSphere(transform.position, settings.viewDistance);
 
         foreach (GameObject go in nearbyBoids)
         {
             Gizmos.color = Color.green;
 
-            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= seperateDistance)
+            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.sperationViewDistance)
             {
                 Gizmos.color = Color.white;
             }
@@ -233,7 +253,7 @@ public class Boid : MonoBehaviour
         }
 
         Gizmos.color = Color.blue;
-        Gizmos.DrawRay(transform.position, DAccel);
+        Gizmos.DrawRay(transform.position, (DAccel * settings.futureSight));
     }
 
 }
