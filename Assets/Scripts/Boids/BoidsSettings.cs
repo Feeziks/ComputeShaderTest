@@ -8,6 +8,9 @@ public class BoidsSettings : ScriptableObject
     public float maxVelocityMagnitude;
     public float speedUp;
 
+    public float alignmentPower;
+    public float cohesionPower;
+
     public float seperationWeight;
     public float alignmentWeight;
     public float cohesionWeight;

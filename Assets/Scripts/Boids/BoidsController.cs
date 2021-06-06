@@ -33,7 +33,7 @@ public class BoidsController : MonoBehaviour
 
     void Update()
     {
-
+        //Start a timer for spawning obstalces
     }
 
     public void OnSliderValueChanged()

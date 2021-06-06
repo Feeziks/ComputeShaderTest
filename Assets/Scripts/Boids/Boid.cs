@@ -138,6 +138,7 @@ public class Boid : MonoBehaviour
         //Probably why we saw adjustment dominate the seperation
         adjustment = averageHeading - transform.position;
         adjustment.Normalize();
+        adjustment *= settings.alignmentPower;
 
         return adjustment;
     }
@@ -161,6 +162,7 @@ public class Boid : MonoBehaviour
 
         adjustment = centerOfMass - transform.position;
         adjustment.Normalize();
+        adjustment *= settings.cohesionPower;
 
         return adjustment;
     }
