@@ -41,9 +41,9 @@ public class Boid : MonoBehaviour
         Vector3 obstacleAceel = AvoidObstacles();
 
         //Sum all of the accelerations according to some weights
-        DAccel += sperationAccel * settings.seperationWeight;
-        DAccel += alignmentAccel * settings.alignmentWeight;
-        DAccel += cohesionAccel * settings.cohesionWeight;
+        DAccel += sperationAccel * settings.seperationWeight * settings.seperationSliderValue;
+        DAccel += alignmentAccel * settings.alignmentWeight * settings.alignmentSliderValue;
+        DAccel += cohesionAccel * settings.cohesionWeight * settings.cohesionSliderValue;
         DAccel += obstacleAceel * settings.obstacleWeight;
 
         //TODO: How / When to change the orientation of the boid so it continues to move "forward"

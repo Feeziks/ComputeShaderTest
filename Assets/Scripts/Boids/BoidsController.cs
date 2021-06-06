@@ -10,6 +10,10 @@ public class BoidsController : MonoBehaviour
     [Header("Flock Parameters")]
     [Min(1)]
     public Slider numBoidsSlider;
+    public Slider SeperationSlider;
+    public Slider AlignmentSlider;
+    public Slider CohesionSlider;
+
     public TMP_Text numBoidsText;
     public BoidsSettings settings;
 
@@ -47,6 +51,13 @@ public class BoidsController : MonoBehaviour
             SpawnBoids((int)(numBoidsSlider.value - boids.Count));
         }
         numBoidsText.text = numBoidsSlider.value.ToString();
+    }
+
+    public void OnWeightSliderValueChanged()
+    {
+        settings.seperationSliderValue = SeperationSlider.value;
+        settings.alignmentSliderValue = AlignmentSlider.value;
+        settings.cohesionSliderValue = CohesionSlider.value;
     }
 
     //TODO: Tries to delete a negative index? or something like that

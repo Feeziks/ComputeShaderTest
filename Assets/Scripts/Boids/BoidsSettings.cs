@@ -11,6 +11,10 @@ public class BoidsSettings : ScriptableObject
     public float alignmentPower;
     public float cohesionPower;
 
+    public float seperationSliderValue;
+    public float alignmentSliderValue;
+    public float cohesionSliderValue;
+
     public float seperationWeight;
     public float alignmentWeight;
     public float cohesionWeight;
