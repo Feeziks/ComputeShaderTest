@@ -6,6 +6,7 @@ public class ObstacleController : MonoBehaviour
 {
     //Public Members
     public ObstacleSettings settings;
+    public List<GameObject> obstacles;
 
     //Private Members
 
@@ -14,8 +15,14 @@ public class ObstacleController : MonoBehaviour
     //Private functions
     void Start()
     {
+        obstacles = new List<GameObject>();
         //Start a co-routine that will spawn an obstacle every n seconds
         StartCoroutine("SpawnObstaclesForever");
+    }
+
+    private void Update()
+    {
+        obstacles.RemoveAll(item => item == null);
     }
 
     private void SpawnObstacle()
@@ -58,7 +65,7 @@ public class ObstacleController : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = false;
         rb.velocity = -1.0f * spawnPointVector * settings.obstacleVelocity;
-
+        obstacles.Add(newObstacle);
         Destroy(newObstacle, 400.0f / settings.obstacleLifeTime);
     }
 

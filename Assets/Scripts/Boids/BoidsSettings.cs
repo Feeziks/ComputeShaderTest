@@ -6,7 +6,6 @@ using UnityEngine;
 public class BoidsSettings : ScriptableObject
 {
     public float maxVelocityMagnitude;
-    public float speedUp;
 
     public float alignmentPower;
     public float cohesionPower;
@@ -24,3 +23,25 @@ public class BoidsSettings : ScriptableObject
     public float viewDistance;
     public float sperationViewDistance;
 }
+
+public struct boidSettingsShader
+{
+    public float maxVelocityMagnitude;
+
+    public float alignmentPower;
+    public float cohesionPower;
+
+    public float seperationSliderValue;
+    public float alignmentSliderValue;
+    public float cohesionSliderValue;
+
+    public float seperationWeight;
+    public float alignmentWeight;
+    public float cohesionWeight;
+    public float obstacleWeight;
+
+    public float futureSight;
+    public float viewDistance;
+    public float sperationViewDistance;
+};
+

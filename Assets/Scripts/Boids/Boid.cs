@@ -240,22 +240,26 @@ public class Boid : MonoBehaviour
     // Misc.
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, settings.viewDistance);
-
-        foreach (GameObject go in nearbyBoids)
+        if (isActiveAndEnabled)
         {
-            Gizmos.color = Color.green;
 
-            if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.sperationViewDistance)
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(transform.position, settings.viewDistance);
+
+            foreach (GameObject go in nearbyBoids)
             {
-                Gizmos.color = Color.white;
-            }
-            Gizmos.DrawLine(transform.position, go.transform.position);
-        }
+                Gizmos.color = Color.green;
 
-        Gizmos.color = Color.blue;
-        Gizmos.DrawRay(transform.position, (DAccel * settings.futureSight));
+                if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.sperationViewDistance)
+                {
+                    Gizmos.color = Color.white;
+                }
+                Gizmos.DrawLine(transform.position, go.transform.position);
+            }
+
+            Gizmos.color = Color.blue;
+            Gizmos.DrawRay(transform.position, (DAccel * settings.futureSight));
+        }
     }
 
 }

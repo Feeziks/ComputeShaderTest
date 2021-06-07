@@ -1,0 +1,180 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Boid
+#include "UnityCG.cginc"
+
+struct boidShader
+{
+	float3 pos;
+	float3 vel;
+    float3 adjustment;
+};
+
+struct obstacleShader
+{
+    float3 pos;
+    float3 vel;
+};
+
+struct boidSettingsShader
+{
+    float maxVelocityMagnitude;
+
+    float alignmentPower;
+    float cohesionPower;
+
+    float seperationSliderValue;
+    float alignmentSliderValue;
+    float cohesionSliderValue;
+
+    float seperationWeight;
+    float alignmentWeight;
+    float cohesionWeight;
+    float obstacleWeight;
+
+    float futureSight;
+    float viewDistance;
+    float sperationViewDistance;
+};
+
+float3 NearestPointOnLine(float3 origin, float3 end, float3 p);
+
+StructuredBuffer<boidSettingsShader> settings;
+StructuredBuffer<obstacleShader> obstacles;
+int numObstacles;
+RWStructuredBuffer<boidShader> boids;
+int numBoids;
+float fixedDeltaTime;
+
+[numthreads(64, 16, 1)]
+void Boid(uint3 id : SV_DispatchThreadID)
+{
+    //Get this boids index into the boids array
+    int thisBoidIdx = id.x + (id.x * id.y);
+    boidSettingsShader mySettings = settings[0];
+
+    //Essentially do the same thing as C#
+    if (thisBoidIdx >= numBoids)
+    {
+        return; //Exit early if we are not required
+    }
+
+    boidShader myBoid = boids[thisBoidIdx];
+    int numNearbyBoids = 0;
+    int numSeperationBoids = 0;
+    int numNearbyObstacles = 0;
+
+    float3 seperation = { 0.0f, 0.0f, 0.0f };
+    float3 alignment = { 0.0f, 0.0f, 0.0f };
+    float3 averageHeading = { 0.0f, 0.0f, 0.0f };
+    float3 cohesion = { 0.0f, 0.0f, 0.0f };
+    float3 centerOfMass = { 0.0f, 0.0f, 0.0f };
+    float3 obstacleAvoidance = { 0.0f, 0.0f, 0.0f };
+
+    for (int i = 0; i < numBoids; i++)
+    {
+        if (i != thisBoidIdx) //Don't check our own boid
+        {
+            //Get the distance to this boid
+            boidShader otherBoid = boids[i];
+            float3 offset = otherBoid.pos - myBoid.pos;
+
+            //Check if we are close enough to see this boid
+            //TODO: Only look at boids in front of us within some FOV
+            float distSqr = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
+
+            if (distSqr < mySettings.viewDistance * mySettings.viewDistance)
+            {
+                numNearbyBoids++;
+
+                //Get that boids next position assuming it continues the same velocity
+                //https://docs.unity3d.com/Manual/SL-UnityShaderVariables.html
+                float3 otherBoidNextPos = otherBoid.pos + (otherBoid.vel * mySettings.futureSight * fixedDeltaTime);
+
+                //Are we close enough to require seperation?
+                if (distSqr < mySettings.sperationViewDistance * mySettings.sperationViewDistance)
+                {
+                    numSeperationBoids++;
+
+                    float3 nearestPoint = NearestPointOnLine(otherBoid.pos, otherBoidNextPos, myBoid.pos);
+                    float3 crossProduct = normalize(cross(myBoid.pos, nearestPoint));
+                    float distToClosestPoint = distance(nearestPoint, myBoid.pos);
+                    float inverseDistance = 1.0f / distToClosestPoint;
+
+                    if (!isinf(inverseDistance) && !isnan(inverseDistance))
+                    {
+                        seperation += crossProduct * inverseDistance;
+                    }
+                }
+
+                //Check alignment
+                float3 otherBoidHeading = otherBoidNextPos - otherBoid.pos;
+                averageHeading += otherBoidHeading;
+
+                //Check Cohesion
+                centerOfMass += otherBoid.pos;
+            }
+        }
+    }
+
+    //Avoid obstacles
+    for (int j = 0; j < numObstacles; j++)
+    {
+        obstacleShader thisObstacle = obstacles[j];
+        float3 offset = thisObstacle.pos - myBoid.pos;
+        float distSqr = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
+        if(distSqr < mySettings.viewDistance * mySettings.viewDistance)
+        {
+            numNearbyObstacles++;
+            float3 obstacleNextPos = thisObstacle.pos + (thisObstacle.vel * mySettings.futureSight * fixedDeltaTime);
+            float3 nearestPoint = NearestPointOnLine(thisObstacle.pos, obstacleNextPos, myBoid.pos);
+            float3 crossProduct = normalize(cross(myBoid.pos, nearestPoint));
+            float distToClosestPoint = distance(nearestPoint, myBoid.pos);
+            float inverseDistance = 1.0f / distToClosestPoint;
+
+            if (!isinf(inverseDistance) && !isnan(inverseDistance))
+            {
+                obstacleAvoidance += crossProduct * inverseDistance;
+            }
+        }
+    }
+
+
+    if (numNearbyBoids > 0)
+    {
+        averageHeading /= numNearbyBoids;
+        alignment = normalize(averageHeading);
+        alignment = alignment * mySettings.alignmentPower * mySettings.alignmentWeight * mySettings.alignmentSliderValue;
+
+        centerOfMass /= numNearbyBoids;
+        cohesion = normalize(centerOfMass);
+        cohesion = cohesion * mySettings.cohesionPower * mySettings.cohesionWeight * mySettings.cohesionSliderValue;
+    }
+
+    if (numSeperationBoids > 0)
+    {
+        seperation /= numSeperationBoids;
+        seperation = seperation * mySettings.seperationWeight * mySettings.seperationSliderValue;
+    }
+
+    if (numNearbyObstacles > 0)
+    {
+        obstacleAvoidance /= numNearbyObstacles;
+        obstacleAvoidance = obstacleAvoidance * mySettings.obstacleWeight;
+    }
+
+    //Set our adjustment
+    myBoid.adjustment = alignment + cohesion + seperation + obstacleAvoidance;
+    boids[thisBoidIdx] = myBoid;
+}
+
+float3 NearestPointOnLine(float3 origin, float3 end, float3 p)
+{
+    float3 heading = end - origin;
+    float magnitudeMax = length(heading);
+    heading = normalize(heading);
+
+    float3 lhs = p - origin;
+    float dotProduct = dot(lhs, heading);
+    dotProduct = clamp(dotProduct, 0.0f, magnitudeMax);
+    return origin + (heading * dotProduct);
+}
