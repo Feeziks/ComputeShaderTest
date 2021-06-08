@@ -115,6 +115,7 @@ void Boid(uint3 id : SV_DispatchThreadID)
         }
     }
 
+    
     //Avoid obstacles
     for (int j = 0; j < numObstacles; j++)
     {
@@ -136,7 +137,7 @@ void Boid(uint3 id : SV_DispatchThreadID)
             }
         }
     }
-
+    
 
     if (numNearbyBoids > 0)
     {
@@ -163,6 +164,7 @@ void Boid(uint3 id : SV_DispatchThreadID)
 
     //Set our adjustment
     myBoid.adjustment = alignment + cohesion + seperation + obstacleAvoidance;
+    myBoid.adjustment = alignment;
     boids[thisBoidIdx] = myBoid;
 }
 

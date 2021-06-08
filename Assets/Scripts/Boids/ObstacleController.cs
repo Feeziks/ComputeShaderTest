@@ -66,7 +66,7 @@ public class ObstacleController : MonoBehaviour
         rb.isKinematic = false;
         rb.velocity = -1.0f * spawnPointVector * settings.obstacleVelocity;
         obstacles.Add(newObstacle);
-        Destroy(newObstacle, 400.0f / settings.obstacleLifeTime);
+        Destroy(newObstacle, settings.obstacleLifeTime);
     }
 
     //Co-routines

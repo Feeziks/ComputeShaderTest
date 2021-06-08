@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf8a817bd89440a49939565a45f65cc0, type: 3}
   m_Name: Obstacle Setting
   m_EditorClassIdentifier: 
-  obstacleFreq: 0.25
+  obstacleFreq: 0.001
   maxNumObstacles: 5
   obstacleVelocity: 80
-  obstacleLifeTime: 0.5
+  obstacleLifeTime: 0.001

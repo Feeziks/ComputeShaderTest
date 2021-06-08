@@ -49,7 +49,7 @@ public class Boid : MonoBehaviour
         //TODO: How / When to change the orientation of the boid so it continues to move "forward"
 
         //Apply this acceleration to the boid as a force
-        myBody.AddForce(DAccel, ForceMode.Force);
+        myBody.AddForce(DAccel, ForceMode.Acceleration);
 
         //If the velocity of the boid is not at the max add another nudge to it in its current direction
         /*

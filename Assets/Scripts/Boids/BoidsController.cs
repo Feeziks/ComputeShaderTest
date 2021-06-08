@@ -18,6 +18,7 @@ public class BoidsController : MonoBehaviour
     public BoidsSettings settings;
 
     public GameObject obstacleControllerGO;
+    public GameObject Boundaries;
 
     public ComputeShader boidComputeShader;
 
@@ -118,7 +119,9 @@ public class BoidsController : MonoBehaviour
                 boidComputeShader.SetBuffer(boidKernelNumber, "obstacles", obstacleBuffer);
             }
 
-            boidComputeShader.Dispatch(boidKernelNumber, 1, 1, 1);
+            int numKernels = Mathf.Max(1, Mathf.CeilToInt(1024 / int.Parse(numBoidsInput.text)));
+
+            boidComputeShader.Dispatch(boidKernelNumber, numKernels, 1, 1);
 
             boidsBuffer.GetData(computeShaderBoids);
 
@@ -135,11 +138,14 @@ public class BoidsController : MonoBehaviour
             {
                 if (VerifyShaderOutput(computeShaderBoids[i].adjustment))
                 {
+                    Debug.Log(computeShaderBoids[i].adjustment);
                     Rigidbody rb = boids[i].GetComponent<Rigidbody>();
-                    rb.AddForce(computeShaderBoids[i].adjustment, ForceMode.Force);
+                    rb.AddForce(computeShaderBoids[i].adjustment, ForceMode.Acceleration);
                     rb.velocity = Vector3.ClampMagnitude(rb.velocity, settings.maxVelocityMagnitude);
                 }
             }
+
+            UpdateComputeShaderStructs();
         }
     }
 
@@ -229,7 +235,7 @@ public class BoidsController : MonoBehaviour
     private void UpdateComputeShaderStructs()
     {
         computeShaderBoids = new boidShader[boids.Count];
-        computeShaderObstacles = new obstacleShader[obstacles.obstacles.Count];
+        computeShaderObstacles = new obstacleShader[obstacles.obstacles.Count + 6];
 
         //Fill in the data
         for(int i = 0; i < computeShaderBoids.Length; i++)
@@ -239,7 +245,13 @@ public class BoidsController : MonoBehaviour
             computeShaderBoids[i].adjustment = new Vector3(0.0f, 0.0f, 0.0f);
         }
 
-        for (int i = 0; i < computeShaderObstacles.Length; i++)
+        for(int i = 0; i < 6; i++)
+        {
+            computeShaderObstacles[i].pos = Boundaries.transform.GetChild(i).transform.position;
+            computeShaderObstacles[i].vel = new Vector3(0.0f, 0.0f, 0.0f);
+        }
+
+        for (int i = 6; i < computeShaderObstacles.Length; i++)
         {
             computeShaderObstacles[i].pos = obstacles.obstacles[i].transform.position;
             computeShaderObstacles[i].vel = obstacles.obstacles[i].GetComponent<Rigidbody>().velocity;
