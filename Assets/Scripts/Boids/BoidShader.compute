@@ -80,18 +80,17 @@ void Boid(uint3 id : SV_DispatchThreadID)
 
             //Check if we are close enough to see this boid
             //TODO: Only look at boids in front of us within some FOV
-            float distSqr = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
+            float d = distance(otherBoid.pos, myBoid.pos);
 
-            if (distSqr < mySettings.viewDistance * mySettings.viewDistance)
+            if (d < mySettings.viewDistance)
             {
                 numNearbyBoids++;
 
                 //Get that boids next position assuming it continues the same velocity
-                //https://docs.unity3d.com/Manual/SL-UnityShaderVariables.html
                 float3 otherBoidNextPos = otherBoid.pos + (otherBoid.vel * mySettings.futureSight * fixedDeltaTime);
 
                 //Are we close enough to require seperation?
-                if (distSqr < mySettings.sperationViewDistance * mySettings.sperationViewDistance)
+                if (d < mySettings.sperationViewDistance)
                 {
                     numSeperationBoids++;
 

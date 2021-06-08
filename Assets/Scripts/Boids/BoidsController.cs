@@ -9,13 +9,12 @@ public class BoidsController : MonoBehaviour
     //Public 
     [Header("Flock Parameters")]
     [Min(1)]
-    public Slider numBoidsSlider;
+    public TMP_InputField numBoidsInput;
     public Slider SeperationSlider;
     public Slider AlignmentSlider;
     public Slider CohesionSlider;
     public Toggle GPUToggle;
 
-    public TMP_Text numBoidsText;
     public BoidsSettings settings;
 
     public GameObject obstacleControllerGO;
@@ -56,20 +55,24 @@ public class BoidsController : MonoBehaviour
     {
         boids = new List<GameObject>();
 
-        SpawnBoids((int)numBoidsSlider.value);
+        SpawnBoids(25);
 
         obstacles = obstacleControllerGO.GetComponent<ObstacleController>();
     }
 
     void Start()
     {
+        settings.seperationSliderValue = SeperationSlider.value;
+        settings.alignmentSliderValue = AlignmentSlider.value;
+        settings.cohesionSliderValue = CohesionSlider.value;
+
         //Casting the class to the struct would probably work but I did not want to risk introducing a difficult to track bug that way
         settingsShader[0].maxVelocityMagnitude     = settings.maxVelocityMagnitude;
         settingsShader[0].alignmentPower           = settings.alignmentPower;
         settingsShader[0].cohesionPower            = settings.cohesionPower;
-        settingsShader[0].seperationSliderValue    = settings.seperationSliderValue;
-        settingsShader[0].alignmentSliderValue     = settings.alignmentSliderValue;
-        settingsShader[0].cohesionSliderValue      = settings.cohesionSliderValue;
+        settingsShader[0].seperationSliderValue    = SeperationSlider.value;
+        settingsShader[0].alignmentSliderValue     = AlignmentSlider.value;
+        settingsShader[0].cohesionSliderValue      = CohesionSlider.value;
         settingsShader[0].seperationWeight         = settings.seperationWeight;
         settingsShader[0].alignmentWeight          = settings.alignmentWeight;
         settingsShader[0].cohesionWeight           = settings.cohesionWeight;
@@ -132,9 +135,9 @@ public class BoidsController : MonoBehaviour
             {
                 if (VerifyShaderOutput(computeShaderBoids[i].adjustment))
                 {
-                    Debug.Log(computeShaderBoids[i].adjustment);
-                    boids[i].GetComponent<Rigidbody>().AddForce(computeShaderBoids[i].adjustment, ForceMode.Acceleration);
-                    boids[i].GetComponent<Rigidbody>().velocity = Vector3.ClampMagnitude(boids[i].GetComponent<Rigidbody>().velocity, settings.maxVelocityMagnitude);
+                    Rigidbody rb = boids[i].GetComponent<Rigidbody>();
+                    rb.AddForce(computeShaderBoids[i].adjustment, ForceMode.Force);
+                    rb.velocity = Vector3.ClampMagnitude(rb.velocity, settings.maxVelocityMagnitude);
                 }
             }
         }
@@ -161,19 +164,19 @@ public class BoidsController : MonoBehaviour
         }
     }
 
-    public void OnSliderValueChanged()
-    {
-        if (boids.Count > numBoidsSlider.value)
-        {
-            DeleteBoids((int)(boids.Count - numBoidsSlider.value));
-        }
-        else if (boids.Count < numBoidsSlider.value)
-        {
-            SpawnBoids((int)(numBoidsSlider.value - boids.Count));
-        }
-        numBoidsText.text = numBoidsSlider.value.ToString();
 
-        //Update values for the compute shader
+    public void OnNumBoidsEdit()
+    {
+        int newNumBoids = int.Parse(numBoidsInput.text);
+        if(boids.Count > newNumBoids)
+        {
+            DeleteBoids(boids.Count - newNumBoids);
+        }
+        else
+        {
+            SpawnBoids(newNumBoids - boids.Count);
+        }
+
         UpdateComputeShaderStructs();
     }
 
@@ -182,6 +185,10 @@ public class BoidsController : MonoBehaviour
         settings.seperationSliderValue = SeperationSlider.value;
         settings.alignmentSliderValue = AlignmentSlider.value;
         settings.cohesionSliderValue = CohesionSlider.value;
+
+        settingsShader[0].seperationSliderValue = settings.seperationSliderValue;
+        settingsShader[0].alignmentSliderValue = settings.alignmentSliderValue;
+        settingsShader[0].cohesionSliderValue = settings.cohesionSliderValue;
     }
 
     //TODO: Tries to delete a negative index? or something like that
@@ -221,7 +228,7 @@ public class BoidsController : MonoBehaviour
 
     private void UpdateComputeShaderStructs()
     {
-        computeShaderBoids = new boidShader[(int)numBoidsSlider.value];
+        computeShaderBoids = new boidShader[boids.Count];
         computeShaderObstacles = new obstacleShader[obstacles.obstacles.Count];
 
         //Fill in the data
