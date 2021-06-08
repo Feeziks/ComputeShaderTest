@@ -1,16 +1,23 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class GameOfLife : MonoBehaviour
 {
     //public members
-    public GameObject RenderTarget;
+    public List<GameObject> RenderTargets;
+    public TMP_Text fpsText;
+    public Toggle GPUToggle;
+
+    public ComputeShader shader;
 
     //private members
-    private const int sizeX = 1920;
-    private const int sizeY = 1080;
-    private Texture2D GameTexture;
+    private const int sizeX = 200;
+    private const int sizeY = 200;
+
+    private List<Texture2D> gameTextures;
 
     struct Cell
     {
@@ -19,7 +26,9 @@ public class GameOfLife : MonoBehaviour
         public int nextState;
     }
 
-    private Cell[,] cells;
+    private const int cellSize = sizeof(float) * 2 + sizeof(int) * 2;
+
+    private List<Cell[,]> cells;
 
     private const int deadState = 0;
     private const int aliveState = 1;
@@ -28,101 +37,230 @@ public class GameOfLife : MonoBehaviour
     static private Color aliveColor = Color.white;
     private Color[] colorsIdxByState = { deadColor, aliveColor };
 
-    private void Start()
+    private void Awake()
     {
-        cells = new Cell[sizeX, sizeY];
-        RandomizeCells();
+        cells = new List<Cell[,]>(RenderTargets.Count);
+        gameTextures = new List<Texture2D>(RenderTargets.Count);
 
-        GameTexture = new Texture2D(sizeX, sizeY);
-        RenderTarget.GetComponent<Renderer>().material.SetTexture("_mainTex", GameTexture);
+        for(int i = 0; i < RenderTargets.Count; i++)
+        {
+            cells.Add(new Cell[sizeX, sizeY]);
+            gameTextures.Add(new Texture2D(sizeX, sizeY));
+            RenderTargets[i].GetComponent<Renderer>().material.mainTexture = gameTextures[i];
+        }
+
+        //Randomizes EVERY game
+        RandomizeCells();
     }
 
     private void Update()
     {
-        TimeStep();
-        ApplyToTexture();
+        float frameTime = 1.0f / Time.deltaTime;
+        fpsText.text = "FPS: " + Mathf.Ceil(frameTime).ToString();
+        if (GPUToggle.isOn)
+        {
+            //Switch to using the GPU
+            TimeStepGPU();
+        }
+        else
+        {
+            //Switch to using CPU
+            TimeStepCPU();
+        }
+        ApplyToTextures();
     }
 
     //Helpers
     private void RandomizeCells()
     {
-        for (int x = 0; x < sizeX; x++)
+        for (int i = 0; i < cells.Count; i++)
         {
-            for (int y = 0; y < sizeY; y++)
+            for (int x = 0; x < sizeX; x++)
             {
-                cells[x, y].position = new Vector2(x, y);
-                cells[x, y].state = (int)Random.Range(0.0f, 1.0f);
+                for (int y = 0; y < sizeY; y++)
+                {
+                    cells[i][x, y].position = new Vector2(x, y);
+                    cells[i][x, y].state = Mathf.RoundToInt(Random.Range(0.0f, 1.0f));
+                }
             }
         }
     }
 
-    private void TimeStep()
+    private void TimeStepGPU()
     {
-        for (int x = 0; x < sizeX; x++)
-        {
-            for (int y = 0; y < sizeY; y++)
-            {
-                int numAliveNeighbors = 0;
-                if (x == 0 || x == sizeX - 1)
-                    continue;
-                if (y == 0 || y == sizeY - 1)
-                    continue;
+        //"Unrolling" the loop so we dont need to wait for dispatches to finish
+        ComputeBuffer[] cellBuffers = new ComputeBuffer[6];
 
-                //Get the state of all 8 neighbors
-                numAliveNeighbors += cells[x, y - 1].state;
-                numAliveNeighbors += cells[x + 1, y - 1].state;
-                numAliveNeighbors += cells[x + 1, y].state;
-                numAliveNeighbors += cells[x + 1, y + 1].state;
-                numAliveNeighbors += cells[x, y + 1].state;
-                numAliveNeighbors += cells[x - 1, y + 1].state;
-                numAliveNeighbors += cells[x - 1, y].state;
-                numAliveNeighbors += cells[x - 1, y - 1].state;
+        cellBuffers[0] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        cellBuffers[1] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        cellBuffers[2] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        cellBuffers[3] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        cellBuffers[4] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        cellBuffers[5] = new ComputeBuffer(sizeX * sizeY, cellSize);
 
-                //Change our next state based on that number of neighbors
-                if (cells[x, y].state == aliveState)
-                {
-                    if (numAliveNeighbors == 2 || numAliveNeighbors == 3)
-                    {
-                        cells[x, y].nextState = aliveState;
-                    }
-                    else
-                    {
-                        cells[x, y].nextState = deadState;
-                    }
-                }
-                else
-                {
-                    if (numAliveNeighbors == 3)
-                    {
-                        cells[x, y].nextState = aliveState;
-                    }
-                    else
-                    {
-                        cells[x, y].nextState = deadState;
-                    }
-                }
-            }
-        }
+        cellBuffers[0].SetData(cells[0]);
+        cellBuffers[1].SetData(cells[1]);
+        cellBuffers[2].SetData(cells[2]);
+        cellBuffers[3].SetData(cells[3]);
+        cellBuffers[4].SetData(cells[4]);
+        cellBuffers[5].SetData(cells[5]);
 
-        for (int x = 0; x < sizeX; x++)
-        {
-            for (int y = 0; y < sizeY; y++)
-            {
-                cells[x, y].state = cells[x, y].nextState;
-            }
-        }
-    }
+        int gameOfLifeKernelNumber = shader.FindKernel("GameOfLife");
 
-    private void ApplyToTexture()
-    {
-        for(int x = sizeX - 1; x >= 0; x--)
-        {
-            for(int y = sizeY - 1; y >= 0; y--)
-            {
-                GameTexture.SetPixel(x, y, colorsIdxByState[cells[x, y].state]);
-            }
-        }
+        //Create instances of the shader? idk if this is a thing or not
+        ComputeShader[] shaderInstances = new ComputeShader[6];
 
+        shaderInstances[0] = shader;
+        shaderInstances[1] = shader;
+        shaderInstances[2] = shader;
+        shaderInstances[3] = shader;
+        shaderInstances[4] = shader;
+        shaderInstances[5] = shader;
+
+        shaderInstances[0].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[0]);
+        shaderInstances[1].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[1]);
+        shaderInstances[2].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[2]);
+        shaderInstances[3].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[3]);
+        shaderInstances[4].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[4]);
+        shaderInstances[5].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[5]);
+
+        shaderInstances[0].SetInt("sizeX", sizeX);
+        shaderInstances[1].SetInt("sizeX", sizeX);
+        shaderInstances[2].SetInt("sizeX", sizeX);
+        shaderInstances[3].SetInt("sizeX", sizeX);
+        shaderInstances[4].SetInt("sizeX", sizeX);
+        shaderInstances[5].SetInt("sizeX", sizeX);
+
+        shaderInstances[0].SetInt("sizeY", sizeY);
+        shaderInstances[1].SetInt("sizeY", sizeY);
+        shaderInstances[2].SetInt("sizeY", sizeY);
+        shaderInstances[3].SetInt("sizeY", sizeY);
+        shaderInstances[4].SetInt("sizeY", sizeY);
+        shaderInstances[5].SetInt("sizeY", sizeY);
+
+        int numKernels = Mathf.Max(1, Mathf.CeilToInt((sizeX * sizeY) / (16 * 16)));
+
+        shaderInstances[0].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+        shaderInstances[1].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+        shaderInstances[2].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+        shaderInstances[3].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+        shaderInstances[4].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+        shaderInstances[5].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
+
+        cellBuffers[0].GetData(cells[0]);
+        cellBuffers[1].GetData(cells[1]);
+        cellBuffers[2].GetData(cells[2]);
+        cellBuffers[3].GetData(cells[3]);
+        cellBuffers[4].GetData(cells[4]);
+        cellBuffers[5].GetData(cells[5]);
+
+        cellBuffers[0].Release();
+        cellBuffers[1].Release();
+        cellBuffers[2].Release();
+        cellBuffers[3].Release();
+        cellBuffers[4].Release();
+        cellBuffers[5].Release();
         
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            for (int x = 0; x < sizeX; x++)
+            {
+                for (int y = 0; y < sizeY; y++)
+                {
+                    cells[i][x, y].state = cells[i][x, y].nextState;
+                }
+            }
+        }
+    }
+
+    private void TimeStepCPU()
+    {
+        for (int i = 0; i < cells.Count; i++)
+        {
+            for (int x = 0; x < sizeX; x++)
+            {
+                for (int y = 0; y < sizeY; y++)
+                {
+                    int numAliveNeighbors = 0;
+                    if(x == 0 || x == sizeX - 1)
+                    {
+                        cells[i][x, y].nextState = deadState;
+                        continue;
+                    }
+                    if(y == 0 || y == sizeY - 1)
+                    {
+                        cells[i][x, y].nextState = deadState;
+                        continue;
+                    }
+
+                    //Get the state of all 8 neighbors
+                    numAliveNeighbors += cells[i][x, y - 1].state;
+                    numAliveNeighbors += cells[i][x + 1, y - 1].state;
+                    numAliveNeighbors += cells[i][x + 1, y].state;
+                    numAliveNeighbors += cells[i][x + 1, y + 1].state;
+                    numAliveNeighbors += cells[i][x, y + 1].state;
+                    numAliveNeighbors += cells[i][x - 1, y + 1].state;
+                    numAliveNeighbors += cells[i][x - 1, y].state;
+                    numAliveNeighbors += cells[i][x - 1, y - 1].state;
+
+                    //Change our next state based on that number of neighbors
+                    if (cells[i][x, y].state == aliveState)
+                    {
+                        if (numAliveNeighbors == 2 || numAliveNeighbors == 3)
+                        {
+                            cells[i][x, y].nextState = aliveState;
+                        }
+                        else
+                        {
+                            cells[i][x, y].nextState = deadState;
+                        }
+                    }
+                    else
+                    {
+                        if (numAliveNeighbors == 3)
+                        {
+                            cells[i][x, y].nextState = aliveState;
+                        }
+                        else
+                        {
+                            cells[i][x, y].nextState = deadState;
+                        }
+                    }
+                    
+                }
+            }
+        }
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            for (int x = 0; x < sizeX; x++)
+            {
+                for (int y = 0; y < sizeY; y++)
+                {
+                    cells[i][x, y].state = cells[i][x, y].nextState;
+                }
+            }
+        }
+    }
+
+    private void ApplyToTextures()
+    {
+        for(int i = 0; i < gameTextures.Count; i++)
+        {
+            for (int x = sizeX - 1; x >= 0; x--)
+            {
+                for (int y = sizeY - 1; y >= 0; y--)
+                {
+                    gameTextures[i].SetPixel(x, y, colorsIdxByState[cells[i][x, y].state]);
+                }
+            }
+            gameTextures[i].Apply();
+        }
+    }
+
+    public void OnRandomizePress()
+    {
+        RandomizeCells();
     }
 }
