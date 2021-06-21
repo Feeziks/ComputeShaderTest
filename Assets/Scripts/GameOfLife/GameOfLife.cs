@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using ComputeShaderUtility;
 
 public class GameOfLife : MonoBehaviour
 {
@@ -24,9 +25,13 @@ public class GameOfLife : MonoBehaviour
         public Vector2 position;
         public int state;
         public int nextState;
+
+        public int idx;
+        public int idy;
+        public int idz;
     }
 
-    private const int cellSize = sizeof(float) * 2 + sizeof(int) * 2;
+    private const int cellSize = sizeof(float) * 2 + sizeof(int) * 2 + sizeof(int) * 3;
 
     private List<Cell[,]> cells;
 
@@ -89,10 +94,13 @@ public class GameOfLife : MonoBehaviour
     private void TimeStepGPU()
     {
         //"Unrolling" the loop so we dont need to wait for dispatches to finish
-        ComputeBuffer[] cellBuffers = new ComputeBuffer[6];
+        ComputeBuffer[] cellBuffers = new ComputeBuffer[6]       
 
-        cellBuffers[0] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        cellBuffers[1] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        ComputeUtils.CreateStructuredBuffer<Cell>(ref cellBuffers[0], sizeX * sizeY);
+        ComputeUtils.CreateStructuredBuffer(ref cellBuffers[1], sizeX * sizeY, cellSize);
+
+        //cellBuffers[0] = new ComputeBuffer(sizeX * sizeY, cellSize);
+        //cellBuffers[1] = new ComputeBuffer(sizeX * sizeY, cellSize);
         cellBuffers[2] = new ComputeBuffer(sizeX * sizeY, cellSize);
         cellBuffers[3] = new ComputeBuffer(sizeX * sizeY, cellSize);
         cellBuffers[4] = new ComputeBuffer(sizeX * sizeY, cellSize);
@@ -169,6 +177,7 @@ public class GameOfLife : MonoBehaviour
                 for (int y = 0; y < sizeY; y++)
                 {
                     cells[i][x, y].state = cells[i][x, y].nextState;
+                    Debug.Log(cells[i][x, y].idx + " " + cells[i][x, y].idy + " " + cells[i][x, y].idz);
                 }
             }
         }

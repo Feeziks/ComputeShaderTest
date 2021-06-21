@@ -6,6 +6,10 @@ struct Cell
     float2 position;
     int state;
     int nextState;
+
+    int idx;
+    int idy;
+    int idz;
 };
 
 
@@ -86,6 +90,10 @@ void GameOfLife (uint3 id : SV_DispatchThreadID)
             myCell.nextState = deadState;
         }
     }
+
+    myCell.idx = id.x;
+    myCell.idy = id.y;
+    myCell.idz = id.z;
 
     cells[myCellIdx] = myCell;
     
