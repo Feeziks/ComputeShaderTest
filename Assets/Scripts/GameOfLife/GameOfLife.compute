@@ -1,108 +1,55 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel GameOfLife
 
-struct Cell
-{
-    float2 position;
-    int state;
-    int nextState;
-
-    int idx;
-    int idy;
-    int idz;
-};
-
-
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWStructuredBuffer<Cell> cells;
-
-uint sizeX;
-uint sizeY;
-
-int deadState = 0;
-int aliveState = 1;
-
-float4 deadColor = {0.0f, 0.0f, 0.0f, 255.0f};
-float4 aliveColor = { 255.0f, 1.0f, 1.0f, 255.0f };
+float sizeX;
+float sizeY;
+sampler2D Input;
+RWTexture2D<float4> Result;
 
 [numthreads(16, 16, 1)]
 void GameOfLife (uint3 id : SV_DispatchThreadID)
 {
-    //Get our cells index
-    uint myCellIdx = id.x + (id.x * id.y);
+    float2 position = float2(((float)id.x) / sizeX, ((float)id.y) / sizeY);
+    float2 pixelSize = float2(1.0f / sizeX, 1.0f / sizeY);
 
-    //Exit early if we are a cell that doesnt matter
-    if (myCellIdx >= sizeX * sizeY)
-        return;
+    float4 currentState = tex2Dlod(Input, float4(position.x, position.y, 0, 0));
 
-    Cell myCell = cells[myCellIdx];
+    float4 neighbors = float4(0, 0, 0, 0);
 
-    //Same for the edges of the cube. In reality we should really check the game that is our neighbor but that sounds hard so I simply wont
-    if (myCellIdx < sizeX || myCellIdx >= sizeX * (sizeY - 1)) //same as y == 0 || y == sizeY - 1
-    {
-        myCell.nextState = deadState;
-        cells[myCellIdx] = myCell;
-        return;
-    }
+    //Get neighbors in all directions
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y + pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x,               position.y + pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y + pixelSize.y, 0, 0));
+                                                
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y, 0, 0));
+                                                
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y - pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x,               position.y - pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y - pixelSize.y, 0, 0));
 
-    if(myCellIdx % sizeX == 0 || (myCellIdx + 1) % sizeX == 0 ) //Same as x == 0 || x == sizeX - 1
-    {
-        myCell.nextState = deadState;
-        cells[myCellIdx] = myCell;
-        return;
-    }
-
-    int numAliveNeighbors = 0;
-
-    //Get the state of all 8 neighbors
-    //Go up is + sizeX
-    //Go down is - sizeX
-    //Left or right is just + - 1
-    numAliveNeighbors += cells[myCellIdx + sizeX].state;        //N
-    numAliveNeighbors += cells[myCellIdx + sizeX + 1].state;    //NE
-    numAliveNeighbors += cells[myCellIdx + 1].state;            //E
-    numAliveNeighbors += cells[myCellIdx - sizeX + 1].state;    //SE
-    numAliveNeighbors += cells[myCellIdx - sizeX].state;        //S
-    numAliveNeighbors += cells[myCellIdx - sizeX - 1].state;    //SW
-    numAliveNeighbors += cells[myCellIdx - 1].state;            //W
-    numAliveNeighbors += cells[myCellIdx + sizeX - 1].state;    //NW
-
-    if (myCell.state == aliveState)
-    {
-        if (numAliveNeighbors == 2 || numAliveNeighbors == 3)
-        {
-            myCell.nextState = aliveState;
-        }
-        else
-        {
-            myCell.nextState = deadState;
-        }
-    }
-    else
-    {
-        if (numAliveNeighbors == 3)
-        {
-            myCell.nextState = aliveState;
-        }
-        else
-        {
-            myCell.nextState = deadState;
-        }
-    }
-
-    myCell.idx = id.x;
-    myCell.idy = id.y;
-    myCell.idz = id.z;
-
-    cells[myCellIdx] = myCell;
     
-    //We could do something here where we wait for every other cell to finish their work then we advance the next state to current state
-    //Not sure how to do that in all honestly
-    //We can sync with our local group easily, but this does NOT ensure that the entire game is finished
-    //I will try that in the next commit and see how that goes
-
-    //We could also do something here where we are passed a render texture and we can immediatly write to it in the shader.
-    //However I again do not know how to apply those values to a Texture2D which is attached to the material
-    //I believe there is a way to do it, im just not sure how
+    //Compare the number of neighbors to the game of life rules
+    if (currentState.r > 0.5) //Current cell is alive
+    {
+        if (neighbors.r > 1.8 && neighbors.r < 3.2) // live cell with 2 or 3 live neighbors
+        {
+            Result[id.xy] = float4(1, 1, 1, 1);
+        }
+        else
+        {
+            Result[id.xy] = float4(0, 0, 0, 1);
+        }
+    }
+    else //Current cell is dead
+    {
+        if (neighbors.r > 2.8 && neighbors.r < 3.2) // dead cell with exactly 3 live neighbors
+        {
+            Result[id.xy] = float4(1, 1, 1, 1);
+        }
+        else
+        {
+            Result[id.xy] = float4(0, 0, 0, 1);
+        }
+    }
 }

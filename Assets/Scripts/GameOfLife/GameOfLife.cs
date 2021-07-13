@@ -25,13 +25,7 @@ public class GameOfLife : MonoBehaviour
         public Vector2 position;
         public int state;
         public int nextState;
-
-        public int idx;
-        public int idy;
-        public int idz;
     }
-
-    private const int cellSize = sizeof(float) * 2 + sizeof(int) * 2 + sizeof(int) * 3;
 
     private List<Cell[,]> cells;
 
@@ -41,6 +35,12 @@ public class GameOfLife : MonoBehaviour
     static private Color deadColor = Color.black;
     static private Color aliveColor = Color.white;
     private Color[] colorsIdxByState = { deadColor, aliveColor };
+
+    //Compute shader members
+    private ComputeShader[] shaders;
+    private RenderTexture[] renderTexturesPing;
+    private RenderTexture[] renderTexturesPong;
+    private bool PingPong = true;
 
     private void Awake()
     {
@@ -54,14 +54,28 @@ public class GameOfLife : MonoBehaviour
             RenderTargets[i].GetComponent<Renderer>().material.mainTexture = gameTextures[i];
         }
 
+
+        //Create GPU Compute Buffers
+        shaders = new ComputeShader[RenderTargets.Count];
+        renderTexturesPing = new RenderTexture[RenderTargets.Count];
+        renderTexturesPong = new RenderTexture[RenderTargets.Count];
+
+        for (int i = 0; i < RenderTargets.Count; i++)
+        {
+            shaders[i] = shader;
+            ComputeUtils.CreateRenderTexture(ref renderTexturesPing[i], sizeX, sizeY, 24);
+            ComputeUtils.CreateRenderTexture(ref renderTexturesPong[i], sizeX, sizeY, 24);
+        }
+
         //Randomizes EVERY game
-        RandomizeCells();
+        RandomizeCells();        
     }
 
     private void Update()
     {
         float frameTime = 1.0f / Time.deltaTime;
         fpsText.text = "FPS: " + Mathf.Ceil(frameTime).ToString();
+
         if (GPUToggle.isOn)
         {
             //Switch to using the GPU
@@ -71,8 +85,8 @@ public class GameOfLife : MonoBehaviour
         {
             //Switch to using CPU
             TimeStepCPU();
+            ApplyToTextures();
         }
-        ApplyToTextures();
     }
 
     //Helpers
@@ -89,98 +103,57 @@ public class GameOfLife : MonoBehaviour
                 }
             }
         }
+
+        if(GPUToggle.isOn)
+        {
+            //Write the cell values to the texture and then copy the textures to render textures
+            ApplyToTextures();
+            for (int i = 0; i < gameTextures.Count; i++)
+            {
+                ComputeUtils.CopyToRenderTexture(gameTextures[i], renderTexturesPing[i]);
+                ComputeUtils.CopyToRenderTexture(gameTextures[i], renderTexturesPong[i]);
+            }
+        }
     }
 
     private void TimeStepGPU()
     {
-        //"Unrolling" the loop so we dont need to wait for dispatches to finish
-        ComputeBuffer[] cellBuffers = new ComputeBuffer[6]       
-
-        ComputeUtils.CreateStructuredBuffer<Cell>(ref cellBuffers[0], sizeX * sizeY);
-        ComputeUtils.CreateStructuredBuffer(ref cellBuffers[1], sizeX * sizeY, cellSize);
-
-        //cellBuffers[0] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        //cellBuffers[1] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        cellBuffers[2] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        cellBuffers[3] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        cellBuffers[4] = new ComputeBuffer(sizeX * sizeY, cellSize);
-        cellBuffers[5] = new ComputeBuffer(sizeX * sizeY, cellSize);
-
-        cellBuffers[0].SetData(cells[0]);
-        cellBuffers[1].SetData(cells[1]);
-        cellBuffers[2].SetData(cells[2]);
-        cellBuffers[3].SetData(cells[3]);
-        cellBuffers[4].SetData(cells[4]);
-        cellBuffers[5].SetData(cells[5]);
-
-        int gameOfLifeKernelNumber = shader.FindKernel("GameOfLife");
-
-        //Create instances of the shader? idk if this is a thing or not
-        ComputeShader[] shaderInstances = new ComputeShader[6];
-
-        shaderInstances[0] = shader;
-        shaderInstances[1] = shader;
-        shaderInstances[2] = shader;
-        shaderInstances[3] = shader;
-        shaderInstances[4] = shader;
-        shaderInstances[5] = shader;
-
-        shaderInstances[0].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[0]);
-        shaderInstances[1].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[1]);
-        shaderInstances[2].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[2]);
-        shaderInstances[3].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[3]);
-        shaderInstances[4].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[4]);
-        shaderInstances[5].SetBuffer(gameOfLifeKernelNumber, "cells", cellBuffers[5]);
-
-        shaderInstances[0].SetInt("sizeX", sizeX);
-        shaderInstances[1].SetInt("sizeX", sizeX);
-        shaderInstances[2].SetInt("sizeX", sizeX);
-        shaderInstances[3].SetInt("sizeX", sizeX);
-        shaderInstances[4].SetInt("sizeX", sizeX);
-        shaderInstances[5].SetInt("sizeX", sizeX);
-
-        shaderInstances[0].SetInt("sizeY", sizeY);
-        shaderInstances[1].SetInt("sizeY", sizeY);
-        shaderInstances[2].SetInt("sizeY", sizeY);
-        shaderInstances[3].SetInt("sizeY", sizeY);
-        shaderInstances[4].SetInt("sizeY", sizeY);
-        shaderInstances[5].SetInt("sizeY", sizeY);
-
-        int numKernels = Mathf.Max(1, Mathf.CeilToInt((sizeX * sizeY) / (16 * 16)));
-
-        shaderInstances[0].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-        shaderInstances[1].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-        shaderInstances[2].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-        shaderInstances[3].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-        shaderInstances[4].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-        shaderInstances[5].Dispatch(gameOfLifeKernelNumber, numKernels, 1, 1);
-
-        cellBuffers[0].GetData(cells[0]);
-        cellBuffers[1].GetData(cells[1]);
-        cellBuffers[2].GetData(cells[2]);
-        cellBuffers[3].GetData(cells[3]);
-        cellBuffers[4].GetData(cells[4]);
-        cellBuffers[5].GetData(cells[5]);
-
-        cellBuffers[0].Release();
-        cellBuffers[1].Release();
-        cellBuffers[2].Release();
-        cellBuffers[3].Release();
-        cellBuffers[4].Release();
-        cellBuffers[5].Release();
-        
-
-        for (int i = 0; i < cells.Count; i++)
+        for (int i = 0; i < RenderTargets.Count; i++)
         {
-            for (int x = 0; x < sizeX; x++)
+            if (PingPong)
             {
-                for (int y = 0; y < sizeY; y++)
-                {
-                    cells[i][x, y].state = cells[i][x, y].nextState;
-                    Debug.Log(cells[i][x, y].idx + " " + cells[i][x, y].idy + " " + cells[i][x, y].idz);
-                }
+                shaders[i].SetTexture(0, "Input", renderTexturesPing[i]);
+                shaders[i].SetTexture(0, "Result", renderTexturesPong[i]);
+            }
+            else 
+            {
+                shaders[i].SetTexture(0, "Input", renderTexturesPong[i]);
+                shaders[i].SetTexture(0, "Result", renderTexturesPing[i]);
+            }
+            shaders[i].SetFloat("sizeX", sizeX);
+            shaders[i].SetFloat("sizeY", sizeY);
+            //Dispatch the kernels
+            shaders[i].Dispatch(0, Mathf.CeilToInt(sizeX / 16f), Mathf.CeilToInt(sizeY / 16f), 1);
+            
+        }
+
+        //Get the data of each kernel and apply it to our 2d textures
+        for(int i = 0; i < RenderTargets.Count; i++)
+        {
+            //Apply the rendertexture to our texture2D's on the objects
+            if (PingPong)
+            {
+                //ComputeUtils.CopyRenderTextureToTexture2D(renderTexturesPong[i], gameTextures[i]);
+                RenderTargets[i].GetComponent<Renderer>().material.mainTexture = renderTexturesPong[i];
+            }
+            else
+            {
+                //ComputeUtils.CopyRenderTextureToTexture2D(renderTexturesPing[i], gameTextures[i]);
+                RenderTargets[i].GetComponent<Renderer>().material.mainTexture = renderTexturesPing[i];
             }
         }
+
+        PingPong = !PingPong;
     }
 
     private void TimeStepCPU()
@@ -271,5 +244,24 @@ public class GameOfLife : MonoBehaviour
     public void OnRandomizePress()
     {
         RandomizeCells();
+    }
+
+    public void OnGpuToggleChange()
+    {
+        if (GPUToggle.isOn)
+        {
+            for (int i = 0; i < gameTextures.Count; i++)
+            {
+                ComputeUtils.CopyToRenderTexture(gameTextures[i], renderTexturesPing[i]);
+                ComputeUtils.CopyToRenderTexture(gameTextures[i], renderTexturesPong[i]);
+            }
+        }
+        else
+        {
+            for(int i =0; i < RenderTargets.Count; i++)
+            {
+                RenderTargets[i].GetComponent<Renderer>().material.mainTexture = gameTextures[i];
+            }
+        }
     }
 }

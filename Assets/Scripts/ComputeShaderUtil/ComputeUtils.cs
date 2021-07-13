@@ -16,12 +16,13 @@
         /// <param name="count"> Number of items ComputeBuffer will be sized to accept</param>
         public static void CreateStructuredBuffer<T>(ref ComputeBuffer buff, int count)
         {
-            //Release the buffer if it is already in use
-            if (buff != null || buff.IsValid())
-                buff.Release();
-
-            //Create the new buffer
-            buff = new ComputeBuffer(count, SizeOfBytes<T>());
+            bool createNewBuffer = buff == null || !buff.IsValid() || buff.count != count || buff.stride != SizeOfBytes<T>();
+            if(createNewBuffer)
+            {
+                if (buff != null)
+                    buff.Release();
+                buff = new ComputeBuffer(count, SizeOfBytes<T>());
+            }
         }
 
         /// <summary>
@@ -32,12 +33,13 @@
         /// <param name="size">Size in Bytes of the data type this Buffer will accept</param>
         public static void CreateStructuredBuffer(ref ComputeBuffer buff, int count, int size)
         {
-            //Release the buffer if it is already in use
-            if (buff != null || buff.IsValid())
-                buff.Release();
-
-            //Create the new buffer
-            buff = new ComputeBuffer(count, size);
+            bool createNewBuffer = buff == null || !buff.IsValid() || buff.count != count || buff.stride != size;
+            if (createNewBuffer)
+            {
+                if(buff != null)
+                    buff.Release();
+                buff = new ComputeBuffer(count, size);
+            }
         }
 
         //Create a buffer an emplace the given data
@@ -50,7 +52,13 @@
         /// <param name="data">Data to place into the ComputeBuffer</param>
         public static void CreateAndSetStructuredBuffer<T>(ref ComputeBuffer buff, T[] data)
         {
-           CreateStructuredBuffer<T>(ref buff, data.Length);
+            CreateStructuredBuffer<T>(ref buff, data.Length);
+            buff.SetData(data);
+        }
+
+        public static void CreateAndSetStructuredBuffer<T>(ref ComputeBuffer buff, T[,] data)
+        {
+            CreateStructuredBuffer<T>(ref buff, data.GetLength(0) * data.GetLength(1));
             buff.SetData(data);
         }
 
@@ -111,33 +119,40 @@
         public static void CreateRenderTexture(ref RenderTexture texture, int width, int height, int depth)
         {
             //Check if the passed texture needs to be cleared
-            if (texture != null || texture.IsCreated())
-                texture.Release();
+            if (texture != null)
+            {
+                if(texture.IsCreated())
+                    texture.Release();
+            }
 
-            if (depth != 0 || depth != 16 || depth != 24)
+            if (depth != 0 && depth != 16 && depth != 24)
                 throw new System.ArgumentException("Depth value must be 0, 16, or 24!");
 
             //Construct and create the texture
             texture = new RenderTexture(width, height, depth);
             texture.enableRandomWrite = true;
-            texture.autoGenerateMips = true;
+            texture.wrapMode = TextureWrapMode.Repeat;
+            texture.filterMode = FilterMode.Point;
+            texture.useMipMap = false;
             texture.Create();
         }
 
         public static void CopyToRenderTexture(Texture source, RenderTexture dest)
         {
+            RenderTexture.active = dest;
             Graphics.Blit(source, dest);
+            RenderTexture.active = null;
         }
 
         public static void CopyRenderTextureToTexture2D(RenderTexture source, Texture2D dest)
         {
-            RenderTexture prevActive = RenderTexture.active;
+            //RenderTexture prevActive = RenderTexture.active;
             RenderTexture.active = source;
             dest.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
             dest.Apply();
-
-            if (prevActive != null)
-                RenderTexture.active = prevActive;
+            RenderTexture.active = null;
+            //if (prevActive != null)
+            //    RenderTexture.active = prevActive;
         }
 
 
