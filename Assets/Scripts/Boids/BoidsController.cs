@@ -1,5 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,6 +16,7 @@ public class BoidsController : MonoBehaviour
     public Slider AlignmentSlider;
     public Slider CohesionSlider;
     public Toggle GPUToggle;
+    public TMP_Text fpsText;
 
     public BoidsSettings settings;
 
@@ -24,6 +27,7 @@ public class BoidsController : MonoBehaviour
 
     //Private
     private List<GameObject> boids;
+    private List<Rigidbody> boidBody;
 
     private boidSettingsShader[] settingsShader = new boidSettingsShader[1];
     private boidShader[] computeShaderBoids;
@@ -31,16 +35,24 @@ public class BoidsController : MonoBehaviour
 
     private ObstacleController obstacles;
 
+    private float[] frameTimes;
+    private uint frameCounter;
+
 
     //Structs to use for the compute shader
     struct boidShader
     {
         public Vector3 pos;
         public Vector3 vel;
-        public Vector3 adjustment;
+
+        public Vector3 flockHeading;
+        public Vector3 flockCenter;
+        public Vector3 seperationHeading;
+        public int numFlockMates;
     };
 
-    const int boidShaderSize = sizeof(float) * 3 * 3;
+
+    const int boidShaderSize = (sizeof(float) * 3) * 5 + sizeof(int);
 
     struct obstacleShader
     {
@@ -55,6 +67,9 @@ public class BoidsController : MonoBehaviour
     private void Awake()
     {
         boids = new List<GameObject>();
+        boidBody = new List<Rigidbody>();
+        frameTimes = new float[100];
+        frameCounter = 0;
 
         SpawnBoids(25);
 
@@ -87,7 +102,11 @@ public class BoidsController : MonoBehaviour
 
     void Update()
     {
-        
+        frameCounter++;
+        frameTimes[frameCounter % 100] = Time.deltaTime;
+        fpsText.text = Mathf.CeilToInt(1.0f / frameTimes.Average()).ToString();
+        if (frameCounter == uint.MaxValue)
+            frameCounter = 0;
     }
 
     private void FixedUpdate()
@@ -136,17 +155,24 @@ public class BoidsController : MonoBehaviour
             //Apply the adjustments to each boid
             for(int i = 0; i < boids.Count; i++)
             {
-                if (VerifyShaderOutput(computeShaderBoids[i].adjustment))
-                {
-                    Debug.Log(computeShaderBoids[i].adjustment);
-                    Rigidbody rb = boids[i].GetComponent<Rigidbody>();
-                    rb.AddForce(computeShaderBoids[i].adjustment, ForceMode.Acceleration);
-                    rb.velocity = Vector3.ClampMagnitude(rb.velocity, settings.maxVelocityMagnitude);
-                }
+                GPUUpdate(boids[i], computeShaderBoids[i], boidBody[i]);
             }
 
             UpdateComputeShaderStructs();
         }
+    }
+
+    private void GPUUpdate(GameObject boid, boidShader shaderOutput, Rigidbody boidRB)
+    {
+        Vector3 acceleration = Vector3.zero;
+
+        acceleration += shaderOutput.seperationHeading + shaderOutput.flockHeading + shaderOutput.flockCenter;
+
+        //apply to the rigid body
+        boidRB.AddForce(acceleration, ForceMode.Acceleration);
+        //Rotate the boid in the direction of travel
+        if(boidRB.velocity.normalized != Vector3.zero)
+            boidRB.MoveRotation(Quaternion.LookRotation(boidRB.velocity.normalized));
     }
 
     public void OnGPUToggleChange()
@@ -204,6 +230,7 @@ public class BoidsController : MonoBehaviour
         {
             GameObject boidToRemove = boids[boids.Count - 1];
             boids.RemoveAt(boids.Count - 1);
+            boidBody.RemoveAt(boidBody.Count - 1);
             Destroy(boidToRemove);
         }
     }
@@ -224,6 +251,7 @@ public class BoidsController : MonoBehaviour
             thisBoid.layer = LayerMask.NameToLayer("Boid_Layer");
             thisBoid.name = "Boid_" + boids.Count;
             boids.Add(thisBoid);
+            boidBody.Add(thisBoid.GetComponent<Rigidbody>());
 
             if(GPUToggle.isOn)
             {
@@ -238,11 +266,14 @@ public class BoidsController : MonoBehaviour
         computeShaderObstacles = new obstacleShader[obstacles.obstacles.Count + 6];
 
         //Fill in the data
-        for(int i = 0; i < computeShaderBoids.Length; i++)
+        for (int i = 0; i < computeShaderBoids.Length; i++)
         {
             computeShaderBoids[i].pos = boids[i].transform.position;
             computeShaderBoids[i].vel = boids[i].GetComponent<Rigidbody>().velocity;
-            computeShaderBoids[i].adjustment = new Vector3(0.0f, 0.0f, 0.0f);
+            computeShaderBoids[i].flockHeading = Vector3.zero;
+            computeShaderBoids[i].flockCenter = Vector3.zero;
+            computeShaderBoids[i].seperationHeading = Vector3.zero;
+            computeShaderBoids[i].numFlockMates = 0;
         }
 
         for(int i = 0; i < 6; i++)

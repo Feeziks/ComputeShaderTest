@@ -46,25 +46,16 @@ public class Boid : MonoBehaviour
         DAccel += cohesionAccel * settings.cohesionWeight * settings.cohesionSliderValue;
         DAccel += obstacleAceel * settings.obstacleWeight;
 
-        //TODO: How / When to change the orientation of the boid so it continues to move "forward"
-
         //Apply this acceleration to the boid as a force
         myBody.AddForce(DAccel, ForceMode.Acceleration);
 
-        //If the velocity of the boid is not at the max add another nudge to it in its current direction
-        /*
-        if(myBody.velocity.magnitude < settings.maxVelocityMagnitude)
-        {
-            myBody.AddForce(transform.up * settings.speedUp);
-        }
-        */
-        //Otherwise clamp the boid's velocity
+        //clamp the boid's velocity
         if(myBody.velocity.magnitude > settings.maxVelocityMagnitude)
         {
             myBody.velocity = Vector3.ClampMagnitude(myBody.velocity, settings.maxVelocityMagnitude);
         }
 
-        //TODO:Rotate the boid in the direction of travel
+        //Rotate the boid in the direction of travel
         myBody.MoveRotation(Quaternion.LookRotation(myBody.velocity.normalized));
     }
 
@@ -82,9 +73,7 @@ public class Boid : MonoBehaviour
             //Whats faster, a second cast at seperate distance or just check the collider for distance
             if (Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.sperationViewDistance)
             {
-                //Nudge the boid to move away from the nearby boid
-                //Take the nearby boids orientation and speed into account if possible
-                //TODO: Is there any need to divide the resulting adjustment by the number of boids nearby?
+                //Nudge the boid to move away from the nearby boid                
 
                 //Naive predict boids next location 
                 Vector3 thatBoidVel = go.GetComponent<Rigidbody>().velocity;
@@ -129,16 +118,17 @@ public class Boid : MonoBehaviour
             Vector3 thatBoidHeading = thatBoidsNextPos - go.transform.position;
             averageHeading += thatBoidHeading;
         }
+
         if (nearbyBoids.Count != 0)
         {
             averageHeading /= (float)nearbyBoids.Count;
-        }
 
-        //This was wrong previously, need to make the adjustment align this boid with the average heading not just assign it the average heading
-        //Probably why we saw adjustment dominate the seperation
-        adjustment = averageHeading - transform.position;
-        adjustment.Normalize();
-        adjustment *= settings.alignmentPower;
+            //This was wrong previously, need to make the adjustment align this boid with the average heading not just assign it the average heading
+            //Probably why we saw adjustment dominate the seperation
+            adjustment = averageHeading - transform.position;
+            adjustment.Normalize();
+            adjustment *= settings.alignmentPower;
+        }
 
         return adjustment;
     }
@@ -158,11 +148,13 @@ public class Boid : MonoBehaviour
         if(nearbyBoids.Count != 0)
         {
             centerOfMass /= nearbyBoids.Count;
+
+            adjustment = centerOfMass - transform.position;
+            adjustment.Normalize();
+            adjustment *= settings.cohesionPower;
         }
 
-        adjustment = centerOfMass - transform.position;
-        adjustment.Normalize();
-        adjustment *= settings.cohesionPower;
+
 
         return adjustment;
     }
@@ -173,9 +165,7 @@ public class Boid : MonoBehaviour
         //Avoid all the obstacles in the boids path
         foreach(GameObject go in nearbyObstacles)
         {
-            Vector3 obstacleVel = go.GetComponent<Rigidbody>().velocity;
-            Vector3 obstacleNextPos = go.transform.position + (obstacleVel * (Time.fixedDeltaTime * settings.futureSight));
-            Vector3 closestPoint = NearestPointOnLine(go.transform.position, obstacleNextPos, transform.position);
+            Vector3 closestPoint = go.GetComponent<Collider>().ClosestPoint(transform.position);
 
             //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
             Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
@@ -209,6 +199,9 @@ public class Boid : MonoBehaviour
 
         foreach(Collider hit in hitColliders)
         {
+            if (hit.gameObject.transform == transform)
+                continue; //Skip ourself
+
             //Sort of bad, since we can ensure the objects we create are only on the one layer this should work
             //Otherwise if the gameobject had multiple layers we should only check that individual bit like this
             //if(hit.gameObject.layer & ( 1 << layerNumber) == (1 << layerNumber))
@@ -255,6 +248,16 @@ public class Boid : MonoBehaviour
                     Gizmos.color = Color.white;
                 }
                 Gizmos.DrawLine(transform.position, go.transform.position);
+            }
+
+            foreach(GameObject go in nearbyObstacles)
+            {
+                Gizmos.color = Color.yellow;
+
+                if(Vector3.Distance(go.GetComponent<Collider>().ClosestPointOnBounds(transform.position), transform.position) <= settings.viewDistance)
+                {
+                    Gizmos.DrawLine(transform.position, go.GetComponent<Collider>().ClosestPointOnBounds(transform.position));
+                }
             }
 
             Gizmos.color = Color.blue;
