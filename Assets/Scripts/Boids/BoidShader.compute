@@ -1,0 +1,148 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Boid
+#include "UnityCG.cginc"
+
+struct boidShader
+{
+	float3 pos;
+	float3 vel;
+
+    float3 flockHeading;
+    float3 flockCenter;
+    float3 seperationHeading;
+    int numFlockMates;
+};
+
+struct obstacleShader
+{
+    float3 pos;
+    float3 vel;
+};
+
+struct boidSettingsShader
+{
+    float maxVelocityMagnitude;
+
+    float alignmentPower;
+    float cohesionPower;
+
+    float seperationSliderValue;
+    float alignmentSliderValue;
+    float cohesionSliderValue;
+
+    float seperationWeight;
+    float alignmentWeight;
+    float cohesionWeight;
+    float obstacleWeight;
+
+    float futureSight;
+    float viewDistance;
+    float sperationViewDistance;
+};
+
+float3 NearestPointOnLine(float3 origin, float3 end, float3 p);
+
+StructuredBuffer<boidSettingsShader> settings;
+
+StructuredBuffer<obstacleShader> obstacles;
+int numObstacles;
+
+RWStructuredBuffer<boidShader> boids;
+int numBoids;
+
+float fixedDeltaTime;
+
+[numthreads(1024, 1, 1)]
+void Boid(uint3 id : SV_DispatchThreadID)
+{
+
+    boidSettingsShader mySettings = settings[0];
+
+    //Essentially do the same thing as C#
+    if (id.x >= (uint)numBoids)
+    {
+        return; //Exit early if we are not required
+    }
+
+    boidShader myBoid = boids[id.x];
+
+    for (uint i = 0; i < (uint)numBoids; i++)
+    {
+        if (i != id.x) //Don't check our own boid
+        {
+            //Get the distance to this boid
+            boidShader otherBoid = boids[i];
+            float3 offset = otherBoid.pos - myBoid.pos;
+            float d = distance(otherBoid.pos, myBoid.pos);
+
+            if (d < settings[0].viewDistance)
+            {
+                myBoid.numFlockMates += 1;
+                myBoid.flockHeading += otherBoid.vel;
+                myBoid.flockCenter += otherBoid.pos;
+
+                if (d < settings[0].sperationViewDistance)
+                {
+                    float3 otherBoidNextPos = otherBoid.pos + (otherBoid.vel * fixedDeltaTime * settings[0].futureSight);
+                    float3 nearestPoint = NearestPointOnLine(otherBoid.pos, otherBoidNextPos, myBoid.pos);
+                    float inverseDistance = 1.0f / distance(myBoid.pos, nearestPoint);
+                    if (!isinf(inverseDistance) && !isnan(inverseDistance))
+                    {
+                        myBoid.seperationHeading += normalize(cross(myBoid.pos, nearestPoint)) * (offset / d);
+                    }
+                }
+            }
+            
+        }
+    }
+    
+    if (myBoid.numFlockMates == 0)
+    {
+        myBoid.seperationHeading = float3( 0, 0, 0 );
+        myBoid.flockHeading = float3( 0, 0, 0 );
+        myBoid.flockCenter = float3( 0, 0, 0 );
+    }
+    else
+    {
+        //Seperation
+        myBoid.seperationHeading *= settings[0].seperationWeight * settings[0].seperationSliderValue;
+
+        //Alignment
+        myBoid.flockHeading = normalize((myBoid.flockHeading / (float)(myBoid.numFlockMates + 1)) - myBoid.pos);
+        myBoid.flockHeading *= settings[0].alignmentWeight * settings[0].alignmentSliderValue * settings[0].alignmentPower;
+
+        //Cohesion
+        myBoid.flockCenter = normalize((myBoid.flockCenter / (float)(myBoid.numFlockMates + 1)) - myBoid.pos);
+        myBoid.flockCenter *= settings[0].cohesionWeight * settings[0].cohesionSliderValue * settings[0].cohesionPower;
+    }
+
+    //Obstacle Avoidance
+    for (int j = 0; j < numObstacles; j++)
+    {
+        obstacleShader thisObstacle = obstacles[j];
+        float dist = distance(thisObstacle.pos, myBoid.pos);
+        if (dist < settings[0].viewDistance)
+        {
+            float inverseDistance = 1.0f / dist;
+            float3 avoidance = normalize(cross(myBoid.pos, thisObstacle.pos));
+            if (!isinf(inverseDistance) && !isnan(inverseDistance))
+            {
+                myBoid.seperationHeading += settings[0].obstacleWeight * avoidance * inverseDistance;
+            }
+        }
+    }
+
+    boids[id.x] = myBoid;
+}
+
+float3 NearestPointOnLine(float3 origin, float3 end, float3 p)
+{
+    float3 heading = end - origin;
+    float magnitudeMax = length(heading);
+    heading = normalize(heading);
+
+    float3 lhs = p - origin;
+    float dotProduct = dot(lhs, heading);
+    dotProduct = clamp(dotProduct, 0.0f, magnitudeMax);
+    return origin + (heading * dotProduct);
+}
