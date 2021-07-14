@@ -140,7 +140,7 @@ public class BoidsController : MonoBehaviour
                 boidComputeShader.SetBuffer(boidKernelNumber, "obstacles", obstacleBuffer);
             }
 
-            int numKernels = Mathf.Max(1, Mathf.CeilToInt(1024 / int.Parse(numBoidsInput.text)));
+            int numKernels = Mathf.Max(1, Mathf.CeilToInt(1024 / boids.Count));
 
             boidComputeShader.Dispatch(boidKernelNumber, numKernels, 1, 1);
 
@@ -248,7 +248,7 @@ public class BoidsController : MonoBehaviour
             thisBoid.transform.SetParent(transform);
             thisBoid.transform.position = new Vector3(Random.Range(-100.0f, 100.0f), Random.Range(-100.0f, 100.0f), Random.Range(-100.0f, 100.0f)); //Place the boid randomly
             thisBoid.transform.rotation = Random.rotation; //Have the boid face a random direction
-            thisBoid.GetComponent<Rigidbody>().AddForce(thisBoid.transform.up * Random.Range(0.0f, 100.0f), ForceMode.Acceleration); //Kick the boid
+            thisBoid.GetComponent<Rigidbody>().AddForce(thisBoid.transform.up * Random.Range(300.0f, 500.0f), ForceMode.Acceleration); //Kick the boid
             thisBoid.layer = LayerMask.NameToLayer("Boid_Layer");
             thisBoid.name = "Boid_" + boids.Count;
             boids.Add(thisBoid);
