@@ -1,0 +1,55 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel GameOfLife
+
+float sizeX;
+float sizeY;
+sampler2D Input;
+RWTexture2D<float4> Result;
+
+[numthreads(16, 16, 1)]
+void GameOfLife (uint3 id : SV_DispatchThreadID)
+{
+    float2 position = float2(((float)id.x) / sizeX, ((float)id.y) / sizeY);
+    float2 pixelSize = float2(1.0f / sizeX, 1.0f / sizeY);
+
+    float4 currentState = tex2Dlod(Input, float4(position.x, position.y, 0, 0));
+
+    float4 neighbors = float4(0, 0, 0, 0);
+
+    //Get neighbors in all directions
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y + pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x,               position.y + pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y + pixelSize.y, 0, 0));
+                                                
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y, 0, 0));
+                                                
+    neighbors += tex2Dlod(Input, float4(position.x + pixelSize.x, position.y - pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x,               position.y - pixelSize.y, 0, 0));
+    neighbors += tex2Dlod(Input, float4(position.x - pixelSize.x, position.y - pixelSize.y, 0, 0));
+
+    
+    //Compare the number of neighbors to the game of life rules
+    if (currentState.r > 0.5) //Current cell is alive
+    {
+        if (neighbors.r > 1.8 && neighbors.r < 3.2) // live cell with 2 or 3 live neighbors
+        {
+            Result[id.xy] = float4(1, 1, 1, 1);
+        }
+        else
+        {
+            Result[id.xy] = float4(0, 0, 0, 1);
+        }
+    }
+    else //Current cell is dead
+    {
+        if (neighbors.r > 2.8 && neighbors.r < 3.2) // dead cell with exactly 3 live neighbors
+        {
+            Result[id.xy] = float4(1, 1, 1, 1);
+        }
+        else
+        {
+            Result[id.xy] = float4(0, 0, 0, 1);
+        }
+    }
+}
