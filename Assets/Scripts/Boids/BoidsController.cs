@@ -25,6 +25,8 @@ public class BoidsController : MonoBehaviour
 
     public ComputeShader boidComputeShader;
 
+    public Material boidMat;
+
     //Private
     private List<GameObject> boids;
     private List<Rigidbody> boidBody;
@@ -223,7 +225,6 @@ public class BoidsController : MonoBehaviour
         settingsShader[0].cohesionSliderValue = settings.cohesionSliderValue;
     }
 
-    //TODO: Tries to delete a negative index? or something like that
     private void DeleteBoids(int numToDelete)
     {
         for(int i = 0; i < numToDelete; i++)
@@ -252,6 +253,7 @@ public class BoidsController : MonoBehaviour
             thisBoid.name = "Boid_" + boids.Count;
             boids.Add(thisBoid);
             boidBody.Add(thisBoid.GetComponent<Rigidbody>());
+            thisBoid.GetComponent<Renderer>().material = boidMat;
 
             if(GPUToggle.isOn)
             {

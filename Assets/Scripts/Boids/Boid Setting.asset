@@ -12,14 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7b93ea8d3715bb41807e69d40d926f2, type: 3}
   m_Name: Boid Setting
   m_EditorClassIdentifier: 
-  maxVelocityMagnitude: 60
-  speedUp: 5
+  maxVelocityMagnitude: 40
   alignmentPower: 3
   cohesionPower: 2
+  seperationSliderValue: 1
+  alignmentSliderValue: 1
+  cohesionSliderValue: 1
   seperationWeight: 1
   alignmentWeight: 0.8
   cohesionWeight: 0.75
-  obstacleWeight: 100
-  futureSight: 100
-  viewDistance: 100
-  sperationViewDistance: 33
+  obstacleWeight: 3
+  futureSight: 6
+  viewDistance: 50
+  sperationViewDistance: 20

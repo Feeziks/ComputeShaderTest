@@ -1,19 +1,20 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
+
 
 public class CubeController : MonoBehaviour
 {
     //Public Inputs
     public Camera cam;
-    
+
     [Header("Cube Settings")]
-    [Min(1)]
-    public int numCubesX;
-    [Min(1)]
-    public int numCubesY;
-    [Min(1)]
-    public int iterations;
+    public TMP_InputField widthInput;
+    public TMP_InputField heightInput;
+    public TMP_InputField loopsInput;
+    public TMP_Text timeOutput;
+    public Material cubeMat;
 
     [Header("ComputeShader")]
     public ComputeShader shader;
@@ -21,11 +22,22 @@ public class CubeController : MonoBehaviour
     private GameObject[,] cubes = new GameObject[0,0];
     private Renderer[,] cubesRenderers = new Renderer[0,0];
 
+    private int numCubesX;
+    private int numCubesY;
+    private int iterations;
 
     public struct Cube
     {
         public Vector3 position;
         public Color color; 
+    }
+
+    public void Awake()
+    {
+        widthInput.text = "30";
+        heightInput.text = "30";
+        loopsInput.text = "1000";
+        OnInputEdit();
     }
 
     public void OnCPURandomizeClick()
@@ -54,7 +66,8 @@ public class CubeController : MonoBehaviour
 
         float endTime = Time.realtimeSinceStartup;
         float runTime = endTime - startTime;
-        Debug.Log("Total Run time for CPU To Randomize " + (numCubesX * numCubesY) + " cubes " + iterations + " times: " + runTime);
+        
+        timeOutput.text = runTime.ToString();
     }
 
     public void OnGPURandomizeClick()
@@ -100,7 +113,8 @@ public class CubeController : MonoBehaviour
         //Measure the amount of time this function takes
         float endTime = Time.realtimeSinceStartup;
         float runTime = endTime - startTime;
-        Debug.Log("Total Run time for GPU To Randomize " + (numCubesX * numCubesY) + " cubes " + iterations + " times: " + runTime);
+        
+        timeOutput.text = runTime.ToString();
 
     }
 
@@ -109,8 +123,6 @@ public class CubeController : MonoBehaviour
     {
         GameObject[,] newCubes = new GameObject[numCubesX, numCubesY];
         Renderer[,] newRenderer = new Renderer[numCubesX, numCubesY];
-
-        Debug.Log("Resizing Cubes Array ... ");
 
         for (int x = 0; x < numCubesX; x++)
         {
@@ -127,6 +139,7 @@ public class CubeController : MonoBehaviour
                 newCubes[x, y].transform.position = new Vector3(x, y, Random.Range(-0.25f, 0.25f));
 
                 newRenderer[x, y] = newCubes[x, y].GetComponent<Renderer>();
+                newRenderer[x, y].material = cubeMat;
             }
         }
 
@@ -155,8 +168,6 @@ public class CubeController : MonoBehaviour
         cubes = newCubes;
         cubesRenderers = newRenderer;
 
-        Debug.Log("Cubes array resized to :[" + cubes.GetLength(0) + ", " + cubes.GetLength(1) + "]");
-
         UpdateCameraPosition();
 
     }
@@ -165,6 +176,15 @@ public class CubeController : MonoBehaviour
     {
         //Get the center position x - y
         cam.transform.position = new Vector3(numCubesX / 2, numCubesY / 2, -1.25f * Mathf.Max(numCubesX, numCubesY));
+    }
+
+    public void OnInputEdit()
+    {
+        numCubesX = int.Parse(widthInput.text);
+        numCubesY = int.Parse(heightInput.text);
+        iterations = int.Parse(loopsInput.text);
+
+        UpdateCubesArray();
     }
 }
 

@@ -165,7 +165,7 @@ public class Boid : MonoBehaviour
         //Avoid all the obstacles in the boids path
         foreach(GameObject go in nearbyObstacles)
         {
-            Vector3 closestPoint = go.GetComponent<Collider>().ClosestPoint(transform.position);
+            Vector3 closestPoint = go.GetComponent<Collider>().ClosestPointOnBounds(transform.position);
 
             //Move away from that point - scaled by inverse distance, so closer points have more weight than further ones
             Vector3 CrossProd = Vector3.Cross(transform.position, closestPoint);
