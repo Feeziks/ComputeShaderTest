@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: Boid Setting
   m_EditorClassIdentifier: 
   maxVelocityMagnitude: 40
-  alignmentPower: 3
-  cohesionPower: 2
-  seperationSliderValue: 1
-  alignmentSliderValue: 1
-  cohesionSliderValue: 1
+  alignmentPower: 1.5
+  cohesionPower: 1.5
+  seperationSliderValue: 2
+  alignmentSliderValue: 0
+  cohesionSliderValue: 0
   seperationWeight: 1
   alignmentWeight: 0.8
   cohesionWeight: 0.75
   obstacleWeight: 3
-  futureSight: 6
-  viewDistance: 50
-  sperationViewDistance: 20
+  futureSight: 10
+  viewDistance: 75
+  sperationViewDistance: 10

@@ -258,7 +258,7 @@ public class GameOfLife : MonoBehaviour
         }
         else
         {
-            for(int i =0; i < RenderTargets.Count; i++)
+            for(int i = 0; i < RenderTargets.Count; i++)
             {
                 RenderTargets[i].GetComponent<Renderer>().material.mainTexture = gameTextures[i];
             }
